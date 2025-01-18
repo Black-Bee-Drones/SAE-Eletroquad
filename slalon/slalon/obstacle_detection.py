@@ -5,7 +5,7 @@ from mirela_sdk.image_processing.camera.oakd_cam import OakdCam
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
-from spatial_calc import HostSpatialsCalc
+from .spatial_calc import HostSpatialsCalc
 import cv2
 
 class ObstacleDetectionNode(Node):
@@ -47,8 +47,8 @@ class ObstacleDetectionNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
 
         # Default ROI dimensions
-        self.roi_width = 200  # ROI width (in pixels)
-        self.roi_height = 200  # ROI height (in pixels)
+        self.roi_width = 80  # ROI width (in pixels)
+        self.roi_height = 300  # ROI height (in pixels)
         self.roi = None  # ROI coordinates, to be calculated dynamically
 
     def centralize_roi(self, frame_width, frame_height, roi_width, roi_height):
@@ -127,7 +127,7 @@ def main(args=None):
     rclpy.init(args=args)
 
     # Enable visualization (set to False to disable it)
-    enable_visualization = True
+    enable_visualization = False
     node = ObstacleDetectionNode(enable_visualization)
 
     try:
