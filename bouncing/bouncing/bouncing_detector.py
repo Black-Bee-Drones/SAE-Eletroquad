@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Float32MultiArray
-from mirela_sdk.image_processing.camera import ImageHandler
+from mirela_sdk.image_processing.camera.image_handler import ImageHandler
 import cv2
 import numpy as np
 
@@ -13,6 +13,7 @@ class BouncingDetector(Node):
         self.state_sub = self.create_subscription(String, "/current_state", self.state_callback, 10)
         self.error_pub = self.create_publisher(Float32MultiArray, "/figure_error", 10)
         self.image_handler.run()
+        
 
     def state_callback(self, msg: String) -> None:
         state: str = msg.data
@@ -27,6 +28,7 @@ class BouncingDetector(Node):
             "star": self.findStar,
             "cross": self.findCross,
             "house": self.findHouse,
+            "none": lambda img: None,
         }
 
         self.image_handler.image_processing_callback = callback_map.get(state, None)

@@ -45,7 +45,7 @@ class MovementNode(Node):
         command: str = msg.data
         if command == "takeoff":
             self.get_logger().info("[Movement] Taking off...")
-            self.drone.arm_takeoff(altitude=1.0)
+            self.drone.arm_takeoff(1.0)
             time.sleep(5)
             self.landed = False
         else:

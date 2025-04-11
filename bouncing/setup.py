@@ -10,6 +10,9 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch',
+            ['launch/bouncing_launch.py']),
+
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,9 +23,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'bouncing_detector = bouncing.BouncingDetector:main',
-            'bouncing_manager = bouncing.BouncingManager:main',
-            'bouncing_movement = bouncing.BouncingMovement:main',
+            'bouncing_detector = bouncing.bouncing_detector:main',
+            'bouncing_manager = bouncing.bouncing_manager:main',
+            'bouncing_movement = bouncing.bouncing_movement:main',
         ],
     },
 )
