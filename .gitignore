@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.env
+venv/
+env/
+.Python
+*.log
+
+# ROS2
+build/
+install/
+log/
+.colcon/
+*.launch.pyc
+*.db3  # SQLite3 files from rosbag2
+*.rviz  # RViz config snapshots
+
+# VSCode
+.vscode/
+.history/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Git
+*.swp
+*.swo
+*.bak
+*.tmp
