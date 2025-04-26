@@ -3,9 +3,11 @@
 Este pacote implementa a lógica de controle para a Missão 2 da competição SAE Aerodesign Eletroquad, utilizando uma Máquina de Estados Finitos (FSM) baseada na biblioteca YASMIN.
 
 ## Descrição da Missão
+
 O objetivo desta missão é decolar transportando um gancho e realizar a colocação ou soltura deste gancho de forma que ele fique preso, por gravidade, a uma mangueira vermelha com 12.7 mm de diâmetro, representando uma linha de transmissão, erguida a 2 metros de altura. O veículo deverá decolar de uma base quadrada no solo contendo um círculo azul e localizar uma mangueira vermelha na qual o gancho deverá ser pendurado. Ao realizar a soltura, o veículo deverá voltar e pousar na base de onde decolou. Para auxiliar na localização da mangueira vermelha, o drone poderá (sem obrigatoriedade) seguir uma linha azul no solo, com 25 cm de espessura.
 
-Cada equipe é responsável pela fabricação do gancho e o desenvolvimento de um mecanismo para segurar e liberar este gancho. O gancho deve ser rígido, e o mecanismo deve garantir a imobilidade relativa entre o gancho e a aeronave durante o voo. Quando acoplado ao mecanismo de soltura da aeronave, o gancho não deve tocar o solo. Além disso, o conjunto formado pelo gancho e o airframe, incluindo o trem de pouso, deve estar inteiramente contido em um círculo de 530 mm de diâmetro quando visto de cima. Ao realizar o pouso, o veículo deve desligar todos os rotores.
+![](./assets/mission_ilustrate.png)
+
 
 ## Implementação
 
@@ -99,18 +101,14 @@ stateDiagram-v2
 
 ## Estrutura do Diretório
 
--   `hook/`: Contém o código Python principal do pacote.
-    -   `hook/states/`: Define a máquina de estados principal (`hang_the_hook_sm.py`) e as classes de estado individuais.
-        -   `hook/states/line_following/`: Estados relacionados ao seguimento da linha azul.
-        -   `hook/states/hook_operations/`: Estados relacionados à centralização, descida e liberação do gancho.
-        -   `basic_states.py`: Estados básicos como Initialize, Takeoff, RTL, End.
-        -   `constants.py`: Constantes usadas nos estados (altitudes, velocidades, parâmetros PID, etc.).
--   `resource/`: Arquivos de recurso, como o marcador de pacote ament.
--   `test/`: Testes unitários ou de integração (se houver).
--   `package.xml`: Metadados do pacote ROS 2, incluindo dependências.
--   `setup.py`: Script de build para pacotes Python ament.
--   `setup.cfg`: Configuração para o setup.py.
--   `README.md`: Este arquivo.
+-   [`hook/`](./hook/): Contém o código Python principal do pacote.
+    -   [`hook/states/`](./hook/hook/states/): Define a máquina de estados principal (`hang_the_hook_sm.py`) e as classes de estado individuais.
+        -   [`hook/states/line_following/`](./hook/hook/states/line_following/): Estados relacionados ao seguimento da linha azul.
+        -   [`hook/states/hook_operations/`](./hook/hook/states/hook_operations/): Estados relacionados à centralização, descida e liberação do gancho.
+        -   [`basic_states.py`](./hook/hook/states/basic_states.py): Estados básicos como Initialize, Takeoff, RTL, End.
+        -   [`constants.py`](./hook/hook/states/constants.py): Constantes usadas nos estados (altitudes, velocidades, parâmetros PID, etc.).
+-   [`package.xml`](./hook/package.xml): Metadados do pacote ROS 2, incluindo dependências.
+-   [`setup.py`](./hook/setup.py): Script de build para pacotes Python ament.
 
 ## Pré-requisitos
 
@@ -123,7 +121,6 @@ stateDiagram-v2
 
 1.  **Instalar YASMIN:**
     ```bash
-    # Substitua $ROS_DISTRO pela sua versão do ROS 2 (ex: humble)
     sudo apt update
     sudo apt install ros-$ROS_DISTRO-yasmin ros-$ROS_DISTRO-yasmin-*
     ```
