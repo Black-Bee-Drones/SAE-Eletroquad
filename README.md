@@ -17,7 +17,6 @@ O fluxo geral da máquina de estados é visualizado abaixo:
 
 ```mermaid
 stateDiagram-v2
-    direction TD
 
     [*] --> INITIALIZE
 
