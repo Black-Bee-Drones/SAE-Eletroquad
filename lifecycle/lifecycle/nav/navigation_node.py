@@ -53,10 +53,40 @@ class NavigationNode(LifecycleNode):
         if msg.data == 'takeoff':
             self.drone.arm_takeoff(takeoff_alt=4.0)
             sleep(5)
-        elif msg.data == 'align':
+        elif msg.data == 'search_for_red_line':
             self.aligned = False
             self.prev_error_x = 0.0
             self.prev_error_y = 0.0
+        elif msg.data == 'drop_hook':
+            self.drone.offboard_velocity_timer(
+                linear_x=0.0,
+                ground_reference=False,
+                pub_rate=30,
+                time=0.5
+            )
+            self.get_logger().info("Dropping hook...")
+            sleep(3)
+            msg = String()
+            msg.data = "drop_hook_complete"
+            self.status_pub.publish(msg)
+        elif msg.data == 'return_to_base':
+            self.drone.rtl()
+            sleep(5)
+            msg = String()
+            msg.data = "return_complete"
+            self.status_pub.publish(msg)
+        elif msg.data == 'land':
+            self.drone.land()
+            sleep(5)
+            msg = String()
+            msg.data = "land_complete"
+            self.status_pub.publish(msg)
+        elif msg.data == 'finished':
+            self.get_logger().info("Mission finished!")
+            msg = String()
+            msg.data = "finished"
+            self.status_pub.publish(msg)
+        
     
     def align_callback(self, msg):
         if self.target_x is None or self.target_y is None:
@@ -96,7 +126,7 @@ class NavigationNode(LifecycleNode):
             self.get_logger().info("Aligned!")
             self.aligned = True
             msg = String()
-            msg.data = "aligned"
+            msg.data = "search_for_red_line_complete"
             self.status_pub.publish(msg)
         else:
             self.aligned = False

@@ -21,7 +21,9 @@ setup(
     entry_points={
         'console_scripts': [
             'mission_control_node = lifecycle.mission_control.mission_control_node:main',
-            'navigation_node = lifecycle.nav.navigation_node:main'
-        ],
+            'navigation_node = lifecycle.nav.navigation_node:main',
+            'vision_node = lifecycle.vision.vision_node:main',
+            'actuator_node = lifecycle.act.actuator_node:main'
+            ],
     },
 )
