@@ -11,6 +11,7 @@
   <depend>mirela_sdk</depend>
   <depend>mirela_interfaces</depend>
   <depend>yasmin</depend>
+  <depend>yasmin_ros</depend>
   <depend>yasmin_viewer</depend>
 
   <test_depend>ament_copyright</test_depend>
