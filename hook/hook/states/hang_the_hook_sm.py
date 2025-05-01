@@ -41,41 +41,41 @@ class HangTheHookSM(StateMachine):
             transitions={SUCCEED: SUCCEED, ABORT: SUCCEED},
         )
 
-        # self.add_state(
-        #     "FOLLOW_BLUE_LINE",
-        #     FollowBlueLineWithRedDetection(),
-        #     transitions={
-        #         "red_detected": "CENTER_RED_BLOB",  # Custom outcome
-        #         ABORT: "RETURN_TO_LAUNCH",
-        #     },
-        # )
+        self.add_state(
+            "FOLLOW_BLUE_LINE",
+            FollowBlueLineWithRedDetection(),
+            transitions={
+                "red_detected": "CENTER_RED_BLOB",  # Custom outcome
+                ABORT: "RETURN_TO_LAUNCH",
+            },
+        )
 
-        # self.add_state(
-        #     "CENTER_RED_BLOB",
-        #     CenterRedBlob(),
-        #     transitions={SUCCEED: "DESCEND_TO_HOOK", ABORT: "RETURN_TO_LAUNCH"},
-        # )
+        self.add_state(
+            "CENTER_RED_BLOB",
+            CenterRedBlob(),
+            transitions={SUCCEED: "DESCEND_TO_HOOK", ABORT: "RETURN_TO_LAUNCH"},
+        )
 
-        # self.add_state(
-        #     "DESCEND_TO_HOOK",
-        #     DescendToHook(),
-        #     transitions={SUCCEED: "RELEASE_HOOK", ABORT: "RETURN_TO_LAUNCH"},
-        # )
+        self.add_state(
+            "DESCEND_TO_HOOK",
+            DescendToHook(),
+            transitions={SUCCEED: "RELEASE_HOOK", ABORT: "RETURN_TO_LAUNCH"},
+        )
 
-        # self.add_state(
-        #     "RELEASE_HOOK",
-        #     ReleaseHook(),
-        #     transitions={
-        #         SUCCEED: "RETURN_TO_LAUNCH",  # Go to RTL after release
-        #         ABORT: "RETURN_TO_LAUNCH",
-        #     },
-        # )
+        self.add_state(
+            "RELEASE_HOOK",
+            ReleaseHook(),
+            transitions={
+                SUCCEED: "RETURN_TO_LAUNCH",  # Go to RTL after release
+                ABORT: "RETURN_TO_LAUNCH",
+            },
+        )
 
-        # self.add_state(
-        #     "RETURN_TO_LAUNCH",
-        #     ReturnToLaunch(),
-        #     transitions={SUCCEED: "END", ABORT: "END"},
-        # )  # Go to End even if RTL fails
+        self.add_state(
+            "RETURN_TO_LAUNCH",
+            ReturnToLaunch(),
+            transitions={SUCCEED: "END", ABORT: "END"},
+        )  # Go to End even if RTL fails
 
         self.add_state("END", End(), transitions={SUCCEED: SUCCEED})
 
