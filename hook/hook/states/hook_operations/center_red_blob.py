@@ -86,7 +86,9 @@ class CenterRedBlob(State):
             yasmin.YASMIN_LOG_ERROR("Failed to start red line detection node.")
             return ABORT
 
-        yasmin.YASMIN_LOG_INFO("Line detection node started successfully for red detection.")
+        yasmin.YASMIN_LOG_INFO(
+            "Line detection node started successfully for red detection."
+        )
         sleep(2)  # Give node time to start
 
         # Initialize setpoint publisher
@@ -143,12 +145,10 @@ class CenterRedBlob(State):
 
         # Main control loop
         while time.time() - start_time < timeout:
-            # Use the PID controller output for y velocity
-            # Note that we negate the output since we want to move in the opposite direction of the error
             blackboard.mavdrone.offboard_velocity(
-                linear_x=0.0,
-                linear_y=-self.current_y_velocity,  # Negate to move toward the center
-                linear_z=0.05,  # Small upward velocity to maintain altitude
+                linear_x=-self.current_y_velocity,
+                linear_y=0.0,
+                linear_z=0.0,
                 angular_z=0.0,
             )
 
