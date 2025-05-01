@@ -88,9 +88,11 @@ class FollowBlueLineWithRedDetection(State):
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
-            yasmin.YASMIN_LOG_ERROR("MavDrone not available in FollowBlueLineWithRedDetection state.")
+            yasmin.YASMIN_LOG_ERROR(
+                "MavDrone not available in FollowBlueLineWithRedDetection state."
+            )
             return ABORT
-        
+
         self.mavdrone = blackboard["mavdrone"]
 
         yasmin.YASMIN_LOG_INFO("Following blue line with red detection...")
@@ -110,9 +112,9 @@ class FollowBlueLineWithRedDetection(State):
         line_detection_cmd = (
             "ros2 run mirela_sdk line_detection_node "
             "--ros-args "
-            "-p line_colors:=blue,red "
+            "-p line_colors:=blue,red"
             "-p show_visualization:=True "
-            "-p image_source:=webcam "
+            "-p image_source:=webcam"
             "-p visualization_name:='Line Following'"
         )
 
