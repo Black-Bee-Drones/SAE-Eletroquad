@@ -19,9 +19,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "mangalarga = hook.mangalarga:main",
-            "test_follow_line = hook.test.test_follow_line:main",
-            "hang_the_hook_sm = hook.states.hang_the_hook_sm:main",
+            "mangalarga = hook.states.hang_the_hook_sm:main",
         ],
     },
 )
