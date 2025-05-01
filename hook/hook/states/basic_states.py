@@ -34,7 +34,7 @@ class Initialize(State):
             blackboard["mavdrone"] = MavDrone(node=YasminNode.get_instance())
             self.mavdrone: MavDrone = blackboard["mavdrone"]
 
-            time.sleep(2) 
+            time.sleep(2)
 
             # if not self.mavdrone.get_state.connected:
             #     yasmin.YASMIN_LOG_ERROR("MAVROS not connected!")
@@ -60,12 +60,12 @@ class Takeoff(State):
         if not "mavdrone" in blackboard:
             yasmin.YASMIN_LOG_ERROR("MavDrone not available in Takeoff state.")
             return ABORT
-        
+
         self.mavdrone = blackboard["mavdrone"]
 
         yasmin.YASMIN_LOG_INFO(f"Attempting takeoff to {TAKEOFF_ALTITUDE}m...")
         try:
-            self.mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
+            # self.mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
 
             time.sleep(3)
 
@@ -74,12 +74,15 @@ class Takeoff(State):
             while time.time() - start_time < timeout:
                 alt = self.mavdrone.get_rel_alt.data
                 yasmin.YASMIN_LOG_INFO(f"Current altitude: {alt:.2f}m")
-                if abs(alt - TAKEOFF_ALTITUDE) < 0.2:  
+                if abs(alt - TAKEOFF_ALTITUDE) < 0.2:
                     yasmin.YASMIN_LOG_INFO("Takeoff altitude reached.")
                     self.mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                     time.sleep(1)
                     return SUCCEED
-                self.mavdrone.offboard_velocity(0.0, 0.0, 0.4, 0.0)
+                if abs(alt - TAKEOFF_ALTITUDE) < 0.0:
+                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.12, 0.0)
+                else:
+                    self.mavdrone.offboard_velocity(0.0, 0.0, -0.12, 0.0)
 
             yasmin.YASMIN_LOG_ERROR("Takeoff timed out.")
             return ABORT
@@ -99,7 +102,7 @@ class ReturnToLaunch(State):
         if not "mavdrone" in blackboard:
             yasmin.YASMIN_LOG_ERROR("MavDrone not available in ReturnToLaunch state.")
             return ABORT
-        
+
         mavdrone: MavDrone = blackboard["mavdrone"]
 
         yasmin.YASMIN_LOG_INFO("Returning to launch...")
