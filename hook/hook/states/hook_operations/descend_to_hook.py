@@ -63,7 +63,9 @@ class DescendToHook(State):
         )
 
         if not ProcessUtils.start_process(line_detection_cmd, LINE_DETECT_NODE_NAME):
-            yasmin.YASMIN_LOG_ERROR("Failed to start red line detection node for descent.")
+            yasmin.YASMIN_LOG_ERROR(
+                "Failed to start red line detection node for descent."
+            )
             return ABORT
 
         yasmin.YASMIN_LOG_INFO("Line detection node started successfully for descent.")
@@ -123,6 +125,9 @@ class DescendToHook(State):
             if rel_alt < MIN_DESCEND_ALTITUDE:
                 yasmin.YASMIN_LOG_INFO(
                     f"Reached minimum safe altitude ({MIN_DESCEND_ALTITUDE}m), ready to drop hook."
+                )
+                blackboard.mavdrone.offboard_velocity(
+                    linear_x=0.0, linear_y=0.0, linear_z=0.0, angular_z=0.0
                 )
                 self._cleanup_resources()
                 return SUCCEED
