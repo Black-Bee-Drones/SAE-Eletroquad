@@ -80,9 +80,9 @@ class Takeoff(State):
                     time.sleep(1)
                     return SUCCEED
                 if abs(alt - TAKEOFF_ALTITUDE) < 0.0:
-                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.12, 0.0)
+                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.1, 0.0)
                 else:
-                    self.mavdrone.offboard_velocity(0.0, 0.0, -0.12, 0.0)
+                    self.mavdrone.offboard_velocity(0.0, 0.0, -0.1, 0.0)
 
             yasmin.YASMIN_LOG_ERROR("Takeoff timed out.")
             return ABORT
@@ -109,16 +109,6 @@ class ReturnToLaunch(State):
 
         try:
             mavdrone.rtl(rtl_alt=RETURN_ALTITUDE)
-            # Wait for landing
-            start_time = time.time()
-            timeout = 60
-            while time.time() - start_time < timeout:
-                state = mavdrone.get_state
-                if not state.armed:
-                    yasmin.YASMIN_LOG_INFO("Drone landed and disarmed.")
-                    return SUCCEED
-                rclpy.spin_once(self.node, timeout_sec=0.5)
-            yasmin.YASMIN_LOG_ERROR("RTL timed out.")
             return ABORT
         except Exception as e:
             yasmin.YASMIN_LOG_ERROR(f"RTL failed: {e}")
@@ -140,16 +130,13 @@ class End(State):
         ProcessUtils.kill_process(ANGLE_PID_PROCESS)
         ProcessUtils.kill_process(CENTERING_PID_PROCESS)
 
-        # Optional: Land drone if not already landed
         mavdrone: MavDrone = blackboard["mavdrone"]
         if mavdrone and mavdrone.get_state.armed:
             yasmin.YASMIN_LOG_INFO("Drone still armed, attempting to disarm...")
             try:
                 # Ensure velocity is zeroed first
                 mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
-                # Only try to land if we're not already on the ground
-                if mavdrone.get_rel_alt.data > 0.5:
-                    mavdrone.land()
+                mavdrone.land()
             except Exception as e:
                 yasmin.YASMIN_LOG_ERROR(f"Failed to land: {e}")
 
