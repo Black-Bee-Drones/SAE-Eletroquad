@@ -34,13 +34,15 @@ class SearchBlueLine(State):
         else:
             self.detection_count = 0  # Reset count if detection lost
         self.line_detected = msg.data  # Store last state
-        yasmin.YASMIN_LOG_INFO(f"Line detected: {msg.data}, Count: {self.detection_count}")
+        yasmin.YASMIN_LOG_INFO(
+            f"Line detected: {msg.data}, Count: {self.detection_count}"
+        )
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
             yasmin.YASMIN_LOG_ERROR("MavDrone not available in SearchBlueLine state.")
             return ABORT
-        
+
         self.mavdrone = blackboard["mavdrone"]
 
         yasmin.YASMIN_LOG_INFO("Searching for blue line...")
@@ -56,7 +58,7 @@ class SearchBlueLine(State):
             "--ros-args "
             "-p line_colors:=blue"
             "-p show_visualization:=True "
-            "-p image_source:=webcam "
+            "-p image_source:=webcam"
             "-p visualization_name:='Blue Line Search'"
         )
 
@@ -87,7 +89,9 @@ class SearchBlueLine(State):
                 linear_x=FORWARD_SPEED, linear_y=0.0, linear_z=0.0, angular_z=0.0
             )
 
-            rclpy.spin_once(YasminNode.get_instance(), timeout_sec=0.05)  # Process callbacks
+            rclpy.spin_once(
+                YasminNode.get_instance(), timeout_sec=0.05
+            )  # Process callbacks
 
             if self.detection_count >= MIN_BLUE_LINE_DETECTIONS:
                 yasmin.YASMIN_LOG_INFO(
