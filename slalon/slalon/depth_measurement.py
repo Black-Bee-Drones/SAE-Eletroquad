@@ -2,29 +2,28 @@ import rclpy
 from rclpy.node import Node
 import cv2
 import numpy as np
-from mirela_sdk.image_processing.camera import ImageHandler
+from std_msgs.msg import Float32
 from std_msgs.msg import Int8
 
-#Incorporar ImageHandler no codigo
-#Analisar o ColorDetector do Samuel
-#Fazer filtro de cores para todos os postes
 #Movimentação do drone conforme as cores
 #Altura max do drone é de 2.5 metros
 #O lado que se deve percorrer a primeira trave é fornecido no dia da prova
 #Transformar em classe
 
 #Cores traves: Preto fosco, Azul escuro, Rosa claro, 
-ROSA = 0
-VERMELHO = 1
-AZUL = 2
-PRETO = 3
 
-class DepthMeasurement:
+class DepthMeasurement(Node):
     def __init__(self, cap=0):
+        super().__init__("DepthMeasurement")
+
+        self.pub = self.create_publisher(Float32, "depth_topic", 10)
+
+        self.left_right = self.create_publisher(Int8, "Left_Right", 10)
 
         self.cap = cv2.VideoCapture(cap)
 
-        self.p_oneMeter_blue = 69
+        #Numero de pixels vezes a distancia da camera à esse numero de pixels
+        self.const: float = 69*97 
         self.lower_range = np.array([115, 62, 85]) 
         self.upper_range = np.array([179, 255, 255])
         self.lower_range2 = None
@@ -60,18 +59,20 @@ class DepthMeasurement:
 
         roi[240:241,:] = 255
 
-        kernel = np.ones((8,8), np.int8)
-
-        const: float = 69*97
 
         result = cv2.bitwise_and(frame, roi, mask=mask)
+        #Conversão para grayscale para que a imagem possua apenas 1 canal
         gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
         pixels_nonzero = np.count_nonzero(gray)
 
 
-        distance = const / pixels_nonzero if pixels_nonzero != 0 else 0
+        distance = self.const / pixels_nonzero if pixels_nonzero != 0 else 0.0
 
-        print(distance)
+        msg = Float32()
+        msg.data = float(distance)
+        self.pub.publish(msg)
+        
+        print(f'{distance:.2f}')
         print(pixels_nonzero)
 
         cv2.imshow("preview", frame)
@@ -80,3 +81,6 @@ class DepthMeasurement:
         if cv2.waitKey(1) == ord('q'):
             cv2.destroyAllWindows()
             self.cap.release()
+
+    def right_or_left(self):
+        pass
