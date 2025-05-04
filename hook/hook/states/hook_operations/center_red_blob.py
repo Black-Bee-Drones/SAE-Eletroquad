@@ -77,8 +77,8 @@ class CenterRedBlob(State):
             "ros2 run mirela_sdk line_detection_node "
             "--ros-args "
             "-p line_colors:=red "
-            "-p show_visualization:=True "
-            "-p image_source:=webcam "
+            "-p show_visualization:=false"
+            "-p image_source:=webcam"
             "-p visualization_name:='Red Centering'"
         )
 

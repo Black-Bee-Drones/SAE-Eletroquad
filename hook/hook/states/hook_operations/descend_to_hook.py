@@ -1,8 +1,9 @@
 import rclpy
 
 import yasmin
-from yasmin import State, Blackboard
+from yasmin import State, StateMachine, Blackboard
 from yasmin_ros.basic_outcomes import SUCCEED, ABORT
+from yasmin_ros.yasmin_node import YasminNode
 
 from mirela_sdk.utils.process import ProcessUtils
 from mirela_interfaces.msg import LineInfo
@@ -18,46 +19,25 @@ from hook.states.constants import (
 )
 
 
-class DescendToHook(State):
-    """Descends to the hook target position and monitors when the drone is close enough"""
+class StartRedLineDetection(State):
+    """Start the red line detection process for descent."""
 
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
-        self.red_line_info_sub = None
-        self.red_detected_sub = None
-        self.max_area = 0
-        self.last_area = 0
-        self.last_detected = False
-        self.area_decreasing_count = 0
-        self.running = True
-
-    def red_line_info_callback(self, msg: LineInfo):
-        """We track area information from the red line to determine proximity"""
-        # Note: LineInfo doesn't currently include area, but this could be added
-        # Here we're just using the callback to know we're still receiving data
-        pass
-
-    def red_detect_callback(self, msg: Bool):
-        """Use the detection status to track if we're still seeing the red line"""
-        self.last_detected = msg.data
+        self.node = YasminNode.get_instance()
 
     def execute(self, blackboard: Blackboard):
-        yasmin.YASMIN_LOG_INFO("Descending towards hook...")
-        self.max_area = 0
-        self.last_area = 0
-        self.last_detected = False
-        self.area_decreasing_count = 0
-        self.running = True
+        yasmin.YASMIN_LOG_INFO("Starting red line detection process for descent...")
 
-        # Clean up any previously running processes
-        self._cleanup_resources()
+        # Kill any existing process with the same name first
+        ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
         # Start line detection node with red color only
         line_detection_cmd = (
             "ros2 run mirela_sdk line_detection_node "
             "--ros-args "
             "-p line_colors:=red "
-            "-p show_visualization:=True "
+            "-p show_visualization:=true "
             "-p image_source:=webcam "
             "-p visualization_name:='Descent Tracking'"
         )
@@ -70,6 +50,45 @@ class DescendToHook(State):
 
         yasmin.YASMIN_LOG_INFO("Line detection node started successfully for descent.")
         sleep(2)  # Give node time to start
+
+        return SUCCEED
+
+
+class PerformDescent(State):
+    """Perform the descent operation while tracking the red line."""
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+        self.red_line_info_sub = None
+        self.red_detected_sub = None
+        self.max_area = 0
+        self.last_area = 0
+        self.last_detected = False
+        self.area_decreasing_count = 0
+        self.node = YasminNode.get_instance()
+
+    def red_line_info_callback(self, msg: LineInfo):
+        """We track area information from the red line to determine proximity"""
+        # Note: LineInfo doesn't currently include area, but this could be added
+        # Here we're just using the callback to know we're still receiving data
+        pass
+
+    def red_detect_callback(self, msg: Bool):
+        """Use the detection status to track if we're still seeing the red line"""
+        self.last_detected = msg.data
+
+    def execute(self, blackboard: Blackboard):
+        if not "mavdrone" in blackboard:
+            yasmin.YASMIN_LOG_ERROR("MavDrone not available in PerformDescent state.")
+            return ABORT
+
+        mavdrone = blackboard["mavdrone"]
+
+        yasmin.YASMIN_LOG_INFO("Descending towards hook...")
+        self.max_area = 0
+        self.last_area = 0
+        self.last_detected = False
+        self.area_decreasing_count = 0
 
         # Subscribe to red line detection status
         self.red_detected_sub = self.node.create_subscription(
@@ -95,7 +114,7 @@ class DescendToHook(State):
         # Main descent loop
         while time.time() - start_time < timeout:
             # Get current relative altitude
-            rel_alt = blackboard.mavdrone.get_rel_alt.data
+            rel_alt = mavdrone.get_rel_alt.data
 
             # Check if we're still detected - if we lose detection too long, we've likely gone too far down
             if not self.last_detected:
@@ -111,11 +130,11 @@ class DescendToHook(State):
                 yasmin.YASMIN_LOG_INFO(
                     "Red line no longer detected consistently, likely at drop position."
                 )
-                self._cleanup_resources()
+                self._cleanup_subscribers()
                 return SUCCEED
 
             # Control lateral position to stay centered while descending
-            blackboard.mavdrone.offboard_velocity(
+            mavdrone.offboard_velocity(
                 linear_x=0.0, linear_y=0.0, linear_z=DESCEND_SPEED, angular_z=0.0
             )
 
@@ -126,19 +145,19 @@ class DescendToHook(State):
                 yasmin.YASMIN_LOG_INFO(
                     f"Reached minimum safe altitude ({MIN_DESCEND_ALTITUDE}m), ready to drop hook."
                 )
-                blackboard.mavdrone.offboard_velocity(
+                mavdrone.offboard_velocity(
                     linear_x=0.0, linear_y=0.0, linear_z=0.0, angular_z=0.0
                 )
-                self._cleanup_resources()
+                self._cleanup_subscribers()
                 return SUCCEED
 
         yasmin.YASMIN_LOG_ERROR("Failed to descend to hook (timeout).")
-        self._cleanup_resources()
+        self._cleanup_subscribers()
         return ABORT
 
-    def _cleanup_resources(self):
-        """Clean up subscribers and processes"""
-        yasmin.YASMIN_LOG_INFO("Cleaning up DescendToHook resources...")
+    def _cleanup_subscribers(self):
+        """Clean up subscribers"""
+        yasmin.YASMIN_LOG_INFO("Cleaning up PerformDescent subscribers...")
 
         # Clean up subscribers
         if self.red_line_info_sub:
@@ -149,7 +168,53 @@ class DescendToHook(State):
             self.node.destroy_subscription(self.red_detected_sub)
             self.red_detected_sub = None
 
+        yasmin.YASMIN_LOG_INFO("PerformDescent subscribers cleanup completed")
+
+
+class CleanupProcesses(State):
+    """Clean up all processes started for descent."""
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED])
+
+    def execute(self, blackboard: Blackboard):
+        yasmin.YASMIN_LOG_INFO("Cleaning up descent processes...")
+
         # Kill the line detection process
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
-        yasmin.YASMIN_LOG_INFO("DescendToHook cleanup completed")
+        yasmin.YASMIN_LOG_INFO("Descent process cleanup completed")
+        return SUCCEED
+
+
+class DescendToHook(StateMachine):
+    """StateMachine that manages the descent to hook operation."""
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+
+        # Define states
+        self.add_state(
+            "START_RED_LINE_DETECTION",
+            StartRedLineDetection(),
+            transitions={SUCCEED: "PERFORM_DESCENT", ABORT: "CLEANUP_PROCESSES"},
+        )
+
+        self.add_state(
+            "PERFORM_DESCENT",
+            PerformDescent(),
+            transitions={SUCCEED: "CLEANUP_PROCESSES", ABORT: "CLEANUP_PROCESSES"},
+        )
+
+        self.add_state(
+            "CLEANUP_PROCESSES",
+            CleanupProcesses(),
+            transitions={SUCCEED: SUCCEED},
+        )
+
+    def execute(self, blackboard):
+        """Execute the state machine with outcome tracking."""
+
+        # Execute with callback for tracking
+        outcome = super().execute(blackboard)
+        return outcome
