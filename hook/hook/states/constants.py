@@ -2,9 +2,9 @@
 TAKEOFF_ALTITUDE = 3.0
 FORWARD_SPEED = 0.5  # m/s
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
-MIN_BLUE_LINE_DETECTIONS = 10  # Consecutive detections to confirm line
+MIN_BLUE_LINE_DETECTIONS = 20  # Consecutive detections to confirm line
 MIN_RED_AREA_THRESHOLD = 5000  # Pixel area to consider red blob significant
-MIN_RED_AREA_CONFIRMATIONS = 5  # Consecutive frames above threshold
+MIN_RED_AREA_CONFIRMATIONS = 20  # Consecutive frames above threshold
 CENTERING_THRESHOLD_RADIUS = 25  # Pixels from center
 CENTERING_CONFIRMATIONS = 5  # Consecutive frames within threshold
 MAX_DESCEND_AREA_FACTOR = 0.95  # Descend until area is 95% of max seen
@@ -15,8 +15,9 @@ HOCK_HOLD_PWM = 1100  # Example PWM
 RETURN_ALTITUDE = 2  # Altitude for RTL
 LINE_DETECT_NODE_NAME = "line_detector_process"
 RED_DETECT_NODE_NAME = "red_detector_process"  # If we make a separate node
-IMAGE_CENTER_X = 320  # Assuming 640x480 image
-IMAGE_CENTER_Y = 240
+IMAGE_CENTER_X = 320.0  
+IMAGE_CENTER_Y = 240.0
+ANGLE_SETPOINT = 0.0
 
 # PID Controller Process Names
 CENTER_PID_PROCESS = "center_pid_process"
