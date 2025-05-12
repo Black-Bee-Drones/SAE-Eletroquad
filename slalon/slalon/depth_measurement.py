@@ -10,7 +10,7 @@ from std_msgs.msg import Int8
 #O lado que se deve percorrer a primeira trave é fornecido no dia da prova
 #Transformar em classe
 
-#Cores traves: Preto fosco, Azul escuro, Rosa claro, 
+#Cores traves: Preto fosco, Azul escuro, Rosa claro, Vermelho
 
 class DepthMeasurement(Node):
     def __init__(self, cap=0):
@@ -18,9 +18,12 @@ class DepthMeasurement(Node):
 
         self.pub = self.create_publisher(Float32, "depth_topic", 10)
 
-        self.left_right = self.create_publisher(Int8, "Left_Right", 10)
+        self.find_pub = self.create_publisher(Int8, "where_is_it", 10)
 
         self.cap = cv2.VideoCapture(cap)
+
+        #self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        #self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
         #Numero de pixels vezes a distancia da camera à esse numero de pixels
         self.const: float = 69*97 
@@ -58,12 +61,12 @@ class DepthMeasurement(Node):
         roi = np.zeros_like(frame)
 
         roi[240:241,:] = 255
-
+        #roi[540:541,:] = 255
 
         result = cv2.bitwise_and(frame, roi, mask=mask)
         #Conversão para grayscale para que a imagem possua apenas 1 canal
-        gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
-        pixels_nonzero = np.count_nonzero(gray)
+        self.gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+        pixels_nonzero = np.count_nonzero(self.gray)
 
 
         distance = self.const / pixels_nonzero if pixels_nonzero != 0 else 0.0
@@ -82,5 +85,23 @@ class DepthMeasurement(Node):
             cv2.destroyAllWindows()
             self.cap.release()
 
-    def right_or_left(self):
-        pass
+    def find_object(self):
+        left = np.count_nonzero(self.gray[:, 0:320]) #[:, 0:960]
+        right= np.count_nonzero(self.gray[:, 320:640]) #[:, 320:640][:, 960:1920]
+
+        msg = Int8()
+
+        if not left and not right:
+            msg.data = 0
+            self.find_pub.publish(msg) #nenhum objeto encontrado
+        elif abs(left - right) <= 50:
+            msg.data = 1
+            self.find_pub.publish(msg) #ta no centro
+        elif left > right:
+            msg.data = 2
+            self.find_pub.publish(msg) #ta mais pra esquerda
+        else:
+            msg.data = 3
+            self.find_pub.publish(msg) #ta mais pra direita
+        
+

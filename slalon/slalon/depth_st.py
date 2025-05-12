@@ -19,6 +19,7 @@ class DepthStateMachine(DepthMeasurement):
 
         #self.depth = DepthMeasurement(2) 
 
+        #criar subscriber pra mudar de estado quando necessario
 
         self.lower_pink = np.array([115, 62, 85]) 
         self.upper_pink = np.array([179, 255, 255])
@@ -36,9 +37,9 @@ class DepthStateMachine(DepthMeasurement):
         self.lower_red2 = np.array([169, 128, 140])
         self.upper_red2 = np.array([179, 255, 223])
 
-        self.run()
-
         self.cont = 0
+        
+        self.run()
 
     def switch_state(self):
         
@@ -82,7 +83,6 @@ class DepthStateMachine(DepthMeasurement):
         self.switch_state()
         self.get_logger().info("rodei")
         self.create_timer(0.001, self.depth_callback)
-        self.create_timer(1, self.teste)
 
 def main():
     rclpy.init()
