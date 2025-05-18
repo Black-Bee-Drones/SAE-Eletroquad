@@ -157,7 +157,7 @@ colcon build --packages-select hook
     ```
 3.  **Execute a máquina de estados principal:**
     ```bash
-    ros2 run hook hang_the_hook_sm
+    ros2 run hook mangalarga
     ```
 
 4.  **(Opcional) Visualizar a Máquina de Estados:**
