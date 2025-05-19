@@ -30,6 +30,13 @@ class MovementStateMachine(Node):
 
         self.distance_to_object = 0
 
+        self.create_timer(0.1, self.check_state)
+
+    def check_state(self):
+        if self.state != self.next_state:
+            self.state = self.next_state
+            self.movement_st()
+
     def depth_callback(self, distance):
         self.distance_to_object = distance
 
@@ -116,44 +123,38 @@ class MovementStateMachine(Node):
         if self.state == 0:
             self.drone.arm_takeoff(1.5)
             sleep(8)
-            self.state = 1
+            self.next_state = 1
 
         elif self.state == 1:
             location = self.right_or_left()
-            self.state = 2
+            self.next_state = 2
 
         elif self.state == 2:
             self.centralize(location)
-            self.state = 3
+            self.next_state = 3
 
         elif self.state == 3:
             self.move_foward()
-            self.state = 4
+            self.next_state = 4
 
         elif self.state == 4:
             self.pass_by()
             self.depth_st.switch_state() #Troca a cor buscada pela maquina de estados
             count_pipe += 1
             if count_pipe == 4:
-                self.state = 5
+                self.next_state = 5
             else:
-                self.state = 1
+                self.next_state = 1
 
         elif self.state == 5: #Estado final
             self.drone.land()
 
-        
-    def run(self):
-        self.get_logger().info("Starting Movement State Machine...")
-        while self.state != 5:
-            self.movement_st()
-            rclpy.spin_once()
 
 def main():
     rclpy.init()
 
     st = MovementStateMachine()
 
-    st.run()
+    rclpy.spin(st)
 
     rclpy.shutdown()
