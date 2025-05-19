@@ -65,7 +65,7 @@ class Takeoff(State):
 
         yasmin.YASMIN_LOG_INFO(f"Attempting takeoff to {TAKEOFF_ALTITUDE}m...")
         try:
-            # self.mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
+            self.mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
 
             time.sleep(3)
 
@@ -123,8 +123,7 @@ class End(State):
 
     def execute(self, blackboard):
         yasmin.YASMIN_LOG_INFO("Mission ended. Cleaning up all processes...")
-
-        # Kill all potential running nodes and processes from previous states
+        
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
         ProcessUtils.kill_process(CENTER_PID_PROCESS)
         ProcessUtils.kill_process(ANGLE_PID_PROCESS)

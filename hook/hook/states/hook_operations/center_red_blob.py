@@ -1,8 +1,9 @@
 import rclpy
 
 import yasmin
-from yasmin import State, Blackboard
+from yasmin import State, StateMachine, Blackboard
 from yasmin_ros.basic_outcomes import SUCCEED, ABORT
+from yasmin_ros.yasmin_node import YasminNode
 
 from mirela_sdk.utils.process import ProcessUtils
 from mirela_interfaces.msg import LineInfo
@@ -22,11 +23,110 @@ from hook.states.constants import (
     CENTERING_D,
     CENTERING_OUTPUT_MIN,
     CENTERING_OUTPUT_MAX,
+    LINE_DETECTION_RED_COLOR_NAME,
+    LINE_DETECTION_RED_SPACE,
+    LINE_DETECTION_IMAGE_SOURCE,
+    LINE_DETECTION_SHOW_VISUALIZATION,
+    LINE_DETECTION_RED_CENTERING_TITLE,
 )
 
 
-class CenterRedBlob(State):
-    """Centers the drone over the red blob (hose target)"""
+class StartRedLineDetection(State):
+    """Start the red line detection process for centering."""
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+        self.node = YasminNode.get_instance()
+
+    def execute(self, blackboard: Blackboard):
+        yasmin.YASMIN_LOG_INFO("Starting red line detection process for centering...")
+
+        ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
+
+        line_detection_cmd = (
+            "ros2 run mirela_sdk line_detection_node "
+            "--ros-args "
+            f"-p line_colors:={LINE_DETECTION_RED_COLOR_NAME} "
+            f"-p spaces:={LINE_DETECTION_RED_SPACE} "
+            f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
+            f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
+            f"-p visualization_name:='{LINE_DETECTION_RED_CENTERING_TITLE}'"
+        )
+
+        if not ProcessUtils.start_process(line_detection_cmd, LINE_DETECT_NODE_NAME):
+            yasmin.YASMIN_LOG_ERROR("Failed to start red line detection node.")
+            return ABORT
+
+        yasmin.YASMIN_LOG_INFO(
+            "Line detection node started successfully for red centering."
+        )
+        sleep(2)
+
+        return SUCCEED
+
+
+class StartCenteringPID(State):
+    """Start the PID controller for centering on the red blob."""
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+        self.node = YasminNode.get_instance()
+
+        # Define topic names
+        self.red_center_state_topic = (
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_x"
+        )
+        self.red_center_setpoint_topic = (
+            f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
+        )
+        self.red_vel_y_topic = f"/{LINE_DETECTION_RED_COLOR_NAME}/velocity_y"
+
+    def execute(self, blackboard: Blackboard):
+        yasmin.YASMIN_LOG_INFO("Starting centering PID controller...")
+
+        ProcessUtils.kill_process(CENTERING_PID_PROCESS)
+
+        center_setpoint_pub = self.node.create_publisher(
+            Float64, self.red_center_setpoint_topic, 10
+        )
+
+        # Publish initial setpoint
+        center_msg = Float64()
+        center_msg.data = IMAGE_CENTER_X
+        center_setpoint_pub.publish(center_msg)
+
+        centering_pid_cmd = (
+            "ros2 run pid_controller pid_controller_standalone "
+            "--ros-args "
+            f"-p p_gain:={CENTERING_P} "
+            f"-p i_gain:={CENTERING_I} "
+            f"-p d_gain:={CENTERING_D} "
+            f"-p output_min:={CENTERING_OUTPUT_MIN} "
+            f"-p output_max:={CENTERING_OUTPUT_MAX} "
+            f"-p state_topic:={self.red_center_state_topic} "
+            f"-p setpoint_topic:={self.red_center_setpoint_topic} "
+            f"-p control_effort_topic:={self.red_vel_y_topic} "
+            "-p publish_rate:=20.0 "
+            "-p auto_start:=true "
+            f"-r __node:={LINE_DETECTION_RED_COLOR_NAME}_center_pid"
+        )
+
+        if not ProcessUtils.start_process(centering_pid_cmd, CENTERING_PID_PROCESS):
+            yasmin.YASMIN_LOG_ERROR("Failed to start centering PID controller.")
+            return ABORT
+
+        yasmin.YASMIN_LOG_INFO("Red centering PID controller started successfully.")
+        sleep(1) 
+
+        blackboard["red_center_state_topic"] = self.red_center_state_topic
+        blackboard["red_center_setpoint_topic"] = self.red_center_setpoint_topic
+        blackboard["red_vel_y_topic"] = self.red_vel_y_topic
+
+        return SUCCEED
+
+
+class PerformCentering(State):
+    """Center the drone over the red blob using PID control."""
 
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
@@ -35,14 +135,8 @@ class CenterRedBlob(State):
         self.centering_confirmations = 0
         self.current_red_center_x = None
         self.current_y_velocity = 0.0
-        self.running = True
         self.last_error_x = 0
-        self.last_error_y = 0
-
-        # Define topic names for improved organization
-        self.red_center_state_topic = "/line_state/red/center_x"
-        self.red_center_setpoint_topic = "/red/center_setpoint"
-        self.red_vel_y_topic = "/red/velocity_y"
+        self.node = YasminNode.get_instance()
 
     def red_line_info_callback(self, msg: LineInfo):
         """Callback for red line state updates"""
@@ -62,82 +156,34 @@ class CenterRedBlob(State):
         self.current_y_velocity = msg.data
 
     def execute(self, blackboard: Blackboard):
+        if not "mavdrone" in blackboard:
+            yasmin.YASMIN_LOG_ERROR("MavDrone not available in PerformCentering state.")
+            return ABORT
+
+        mavdrone = blackboard["mavdrone"]
+
+        red_center_state_topic = blackboard.get(
+            "red_center_state_topic",
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_x",
+        )
+        red_vel_y_topic = blackboard.get(
+            "red_vel_y_topic", f"/{LINE_DETECTION_RED_COLOR_NAME}/velocity_y"
+        )
+
         yasmin.YASMIN_LOG_INFO("Centering on red blob...")
         self.centering_confirmations = 0
-        self.running = True
         self.last_error_x = 0
-        self.last_error_y = 0
         self.current_y_velocity = 0.0
 
-        # Clean up any existing processes
-        self._cleanup_resources()
-
-        # Ensure line detection node is running with red color
-        line_detection_cmd = (
-            "ros2 run mirela_sdk line_detection_node "
-            "--ros-args "
-            "-p line_colors:=red "
-            "-p show_visualization:=false"
-            "-p image_source:=webcam"
-            "-p visualization_name:='Red Centering'"
-        )
-
-        if not ProcessUtils.start_process(line_detection_cmd, LINE_DETECT_NODE_NAME):
-            yasmin.YASMIN_LOG_ERROR("Failed to start red line detection node.")
-            return ABORT
-
-        yasmin.YASMIN_LOG_INFO(
-            "Line detection node started successfully for red detection."
-        )
-        sleep(2)  # Give node time to start
-
-        # Initialize setpoint publisher
-        center_setpoint_pub = self.node.create_publisher(
-            Float64, self.red_center_setpoint_topic, 10
-        )
-
-        # Publish initial setpoint
-        center_msg = Float64()
-        center_msg.data = IMAGE_CENTER_X
-        center_setpoint_pub.publish(center_msg)
-
-        # Start PID controller for centering the red blob
-        centering_pid_cmd = (
-            "ros2 run pid_controller pid_controller_standalone "
-            "--ros-args "
-            f"-p p_gain:={CENTERING_P} "
-            f"-p i_gain:={CENTERING_I} "
-            f"-p d_gain:={CENTERING_D} "
-            f"-p output_min:={CENTERING_OUTPUT_MIN} "
-            f"-p output_max:={CENTERING_OUTPUT_MAX} "
-            f"-p state_topic:={self.red_center_state_topic} "
-            f"-p setpoint_topic:={self.red_center_setpoint_topic} "
-            f"-p control_effort_topic:={self.red_vel_y_topic} "
-            "-p publish_rate:=20.0 "
-            "-p auto_start:=true "
-            "-r __node:=red_center_pid"
-        )
-
-        # Start PID controller process
-        if not ProcessUtils.start_process(centering_pid_cmd, CENTERING_PID_PROCESS):
-            yasmin.YASMIN_LOG_ERROR("Failed to start centering PID controller.")
-            self._cleanup_resources()
-            return ABORT
-
-        yasmin.YASMIN_LOG_INFO("Red centering PID controller started successfully.")
-        sleep(1)  # Give controller time to initialize
-
-        # Subscribe to red line info
         self.red_line_info_sub = self.node.create_subscription(
             LineInfo,
-            "/line_state/red",
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_line_info_callback,
             10,
         )
 
-        # Subscribe to control effort from PID controller
         self.control_effort_y_sub = self.node.create_subscription(
-            Float64, self.red_vel_y_topic, self.control_effort_y_callback, 10
+            Float64, red_vel_y_topic, self.control_effort_y_callback, 10
         )
 
         start_time = time.time()
@@ -145,7 +191,7 @@ class CenterRedBlob(State):
 
         # Main control loop
         while time.time() - start_time < timeout:
-            blackboard.mavdrone.offboard_velocity(
+            mavdrone.offboard_velocity(
                 linear_x=-self.current_y_velocity,
                 linear_y=0.0,
                 linear_z=0.0,
@@ -156,16 +202,16 @@ class CenterRedBlob(State):
 
             if self.centering_confirmations >= CENTERING_CONFIRMATIONS:
                 yasmin.YASMIN_LOG_INFO("Red blob centered.")
-                self._cleanup_resources()
+                self._cleanup_subscribers()
                 return SUCCEED
 
-        yasmin.YASMIN_LOG_ERROR("Failed to center on red blob.")
-        self._cleanup_resources()
+        yasmin.YASMIN_LOG_ERROR("Failed to center on red blob (timeout).")
+        self._cleanup_subscribers()
         return ABORT
 
-    def _cleanup_resources(self):
-        """Clean up resources"""
-        yasmin.YASMIN_LOG_INFO("Cleaning up CenterRedBlob resources...")
+    def _cleanup_subscribers(self):
+        """Clean up subscribers"""
+        yasmin.YASMIN_LOG_INFO("Cleaning up PerformCentering subscribers...")
 
         if self.red_line_info_sub:
             self.node.destroy_subscription(self.red_line_info_sub)
@@ -175,8 +221,56 @@ class CenterRedBlob(State):
             self.node.destroy_subscription(self.control_effort_y_sub)
             self.control_effort_y_sub = None
 
-        # Kill the PID controller process
+        yasmin.YASMIN_LOG_INFO("PerformCentering subscribers cleanup completed")
+
+
+class CleanupProcesses(State):
+    """Clean up all processes started for centering."""
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED])
+
+    def execute(self, blackboard: Blackboard):
+        yasmin.YASMIN_LOG_INFO("Cleaning up centering processes...")
+
         ProcessUtils.kill_process(CENTERING_PID_PROCESS)
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
-        yasmin.YASMIN_LOG_INFO("CenterRedBlob cleanup completed")
+        yasmin.YASMIN_LOG_INFO("Centering process cleanup completed")
+        return SUCCEED
+
+
+class CenterRedBlob(StateMachine):
+    """StateMachine that manages centering on the red blob."""
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+
+        # Define states
+        self.add_state(
+            "START_RED_LINE_DETECTION",
+            StartRedLineDetection(),
+            transitions={SUCCEED: "START_CENTERING_PID", ABORT: "CLEANUP_PROCESSES"},
+        )
+
+        self.add_state(
+            "START_CENTERING_PID",
+            StartCenteringPID(),
+            transitions={SUCCEED: "PERFORM_CENTERING", ABORT: "CLEANUP_PROCESSES"},
+        )
+
+        self.add_state(
+            "PERFORM_CENTERING",
+            PerformCentering(),
+            transitions={SUCCEED: "CLEANUP_PROCESSES", ABORT: "CLEANUP_PROCESSES"},
+        )
+
+        self.add_state(
+            "CLEANUP_PROCESSES", CleanupProcesses(), transitions={SUCCEED: SUCCEED}
+        )
+
+    def execute(self, blackboard):
+        """Execute the state machine with outcome tracking."""
+        # Execute the standard StateMachine execution
+        outcome = super().execute(blackboard)
+        return outcome

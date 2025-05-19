@@ -15,6 +15,11 @@ from hook.states.constants import (
     FORWARD_SPEED,
     MIN_BLUE_LINE_DETECTIONS,
     LINE_DETECT_NODE_NAME,
+    LINE_DETECTION_BLUE_COLOR_NAME,
+    LINE_DETECTION_BLUE_SPACE,
+    LINE_DETECTION_IMAGE_SOURCE,
+    LINE_DETECTION_SHOW_VISUALIZATION,
+    LINE_DETECTION_BLUE_SEARCH_TITLE,
 )
 
 
@@ -28,17 +33,16 @@ class StartBlueLineDetection(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Starting blue line detection process...")
 
-        # Kill any existing process with the same name first
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
-        # Start line detection node with blue color
         line_detection_cmd = (
             "ros2 run mirela_sdk line_detection_node "
             "--ros-args "
-            "-p line_colors:=blue "  
-            "-p show_visualization:=True " 
-            "-p image_source:=webcam "  
-            "-p visualization_name:='Blue Line Search'"
+            f"-p line_colors:={LINE_DETECTION_BLUE_COLOR_NAME} "
+            f"-p spaces:={LINE_DETECTION_BLUE_SPACE} "
+            f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
+            f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
+            f"-p visualization_name:='{LINE_DETECTION_BLUE_SEARCH_TITLE}'"
         )
 
         if not ProcessUtils.start_process(
@@ -50,7 +54,7 @@ class StartBlueLineDetection(State):
         yasmin.YASMIN_LOG_INFO(
             "Line detection node started successfully for blue line search."
         )
-        sleep(2)  # Give node time to start
+        sleep(2)
 
         return SUCCEED
 
@@ -71,7 +75,7 @@ class SearchForBlueLine(State):
             self.detection_count += 1
         else:
             self.detection_count = 0  # Reset count if detection lost
-        self.line_detected = msg.data  # Store last state
+        self.line_detected = msg.data
         yasmin.YASMIN_LOG_INFO(
             f"Line detected: {msg.data}, Count: {self.detection_count}"
         )
@@ -89,10 +93,9 @@ class SearchForBlueLine(State):
         self.detection_count = 0
         self.line_detected = False
 
-        # Subscribe to line detection status for blue
         self.line_detected_sub = self.node.create_subscription(
             Bool,
-            "/line_detect/blue",  # Topic with color name
+            f"/line_detect/{LINE_DETECTION_BLUE_COLOR_NAME}",
             self.line_detect_callback,
             10,
         )
@@ -100,22 +103,18 @@ class SearchForBlueLine(State):
         start_time = time.time()
         timeout = 60  # seconds
 
-        # Main search loop
         while time.time() - start_time < timeout:
-            # Command forward velocity
             self.mavdrone.offboard_velocity(
                 linear_x=FORWARD_SPEED, linear_y=0.0, linear_z=0.0, angular_z=0.0
             )
 
-            rclpy.spin_once(
-                YasminNode.get_instance(), timeout_sec=0.05
-            )  # Process callbacks
+            rclpy.spin_once(YasminNode.get_instance(), timeout_sec=0.05)
 
             if self.detection_count >= MIN_BLUE_LINE_DETECTIONS:
                 yasmin.YASMIN_LOG_INFO(
                     f"Blue line confirmed after {self.detection_count} detections."
                 )
-                # Cleanup subscriber
+
                 if self.line_detected_sub:
                     self.node.destroy_subscription(self.line_detected_sub)
                     self.line_detected_sub = None
@@ -124,7 +123,6 @@ class SearchForBlueLine(State):
 
         yasmin.YASMIN_LOG_ERROR("Search for blue line timed out.")
 
-        # Cleanup subscriber
         if self.line_detected_sub:
             self.node.destroy_subscription(self.line_detected_sub)
             self.line_detected_sub = None
@@ -141,7 +139,6 @@ class CleanupResources(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Cleaning up SearchBlueLine resources...")
 
-        # Kill the line detection process
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
         yasmin.YASMIN_LOG_INFO("SearchBlueLine cleanup completed")
@@ -154,7 +151,6 @@ class SearchBlueLine(StateMachine):
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
 
-        # Define states
         self.add_state(
             "START_DETECTION",
             StartBlueLineDetection(),
@@ -174,8 +170,6 @@ class SearchBlueLine(StateMachine):
         )
 
     def execute(self, blackboard):
-        """Execute the state machine with outcome tracking."""
-        # Execute the standard StateMachine execution with outcome tracking
         outcome = super().execute(blackboard)
         self._last_outcome = outcome
         return outcome

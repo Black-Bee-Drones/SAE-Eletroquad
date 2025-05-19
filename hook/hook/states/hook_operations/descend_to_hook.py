@@ -16,6 +16,11 @@ from hook.states.constants import (
     DESCEND_SPEED,
     MIN_DESCEND_ALTITUDE,
     LINE_DETECT_NODE_NAME,
+    LINE_DETECTION_RED_COLOR_NAME,
+    LINE_DETECTION_RED_SPACE,
+    LINE_DETECTION_IMAGE_SOURCE,
+    LINE_DETECTION_SHOW_VISUALIZATION,
+    LINE_DETECTION_DESCENT_TITLE,
 )
 
 
@@ -28,18 +33,17 @@ class StartRedLineDetection(State):
 
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Starting red line detection process for descent...")
-
-        # Kill any existing process with the same name first
+        
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
-        # Start line detection node with red color only
         line_detection_cmd = (
             "ros2 run mirela_sdk line_detection_node "
             "--ros-args "
-            "-p line_colors:=red "
-            "-p show_visualization:=true "
-            "-p image_source:=webcam "
-            "-p visualization_name:='Descent Tracking'"
+            f"-p line_colors:={LINE_DETECTION_RED_COLOR_NAME} "
+            f"-p spaces:={LINE_DETECTION_RED_SPACE} "
+            f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
+            f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
+            f"-p visualization_name:='{LINE_DETECTION_DESCENT_TITLE}'"
         )
 
         if not ProcessUtils.start_process(line_detection_cmd, LINE_DETECT_NODE_NAME):
@@ -49,7 +53,7 @@ class StartRedLineDetection(State):
             return ABORT
 
         yasmin.YASMIN_LOG_INFO("Line detection node started successfully for descent.")
-        sleep(2)  # Give node time to start
+        sleep(2)
 
         return SUCCEED
 
@@ -90,18 +94,16 @@ class PerformDescent(State):
         self.last_detected = False
         self.area_decreasing_count = 0
 
-        # Subscribe to red line detection status
         self.red_detected_sub = self.node.create_subscription(
             Bool,
-            "/line_detect/red",
+            f"/line_detect/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_detect_callback,
             10,
         )
 
-        # Subscribe to red line info if needed for future enhancements
         self.red_line_info_sub = self.node.create_subscription(
             LineInfo,
-            "/line_state/red",
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_line_info_callback,
             10,
         )
@@ -113,7 +115,6 @@ class PerformDescent(State):
 
         # Main descent loop
         while time.time() - start_time < timeout:
-            # Get current relative altitude
             rel_alt = mavdrone.get_rel_alt.data
 
             # Check if we're still detected - if we lose detection too long, we've likely gone too far down
@@ -132,15 +133,13 @@ class PerformDescent(State):
                 )
                 self._cleanup_subscribers()
                 return SUCCEED
-
-            # Control lateral position to stay centered while descending
+            
             mavdrone.offboard_velocity(
                 linear_x=0.0, linear_y=0.0, linear_z=DESCEND_SPEED, angular_z=0.0
             )
 
             rclpy.spin_once(self.node, timeout_sec=0.05)
 
-            # Safety check for minimum altitude
             if rel_alt < MIN_DESCEND_ALTITUDE:
                 yasmin.YASMIN_LOG_INFO(
                     f"Reached minimum safe altitude ({MIN_DESCEND_ALTITUDE}m), ready to drop hook."
@@ -180,7 +179,6 @@ class CleanupProcesses(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Cleaning up descent processes...")
 
-        # Kill the line detection process
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
         yasmin.YASMIN_LOG_INFO("Descent process cleanup completed")
@@ -193,7 +191,6 @@ class DescendToHook(StateMachine):
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
 
-        # Define states
         self.add_state(
             "START_RED_LINE_DETECTION",
             StartRedLineDetection(),
@@ -214,7 +211,5 @@ class DescendToHook(StateMachine):
 
     def execute(self, blackboard):
         """Execute the state machine with outcome tracking."""
-
-        # Execute with callback for tracking
         outcome = super().execute(blackboard)
         return outcome

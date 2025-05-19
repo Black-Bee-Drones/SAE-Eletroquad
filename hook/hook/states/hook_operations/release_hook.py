@@ -20,15 +20,12 @@ class ReleaseHook(State):
         mavdrone = blackboard["mavdrone"]
 
         try:
-            # Stop movement
             mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
             time.sleep(1)
 
-            # Activate servo to release position
             mavdrone.do_servo(HOCK_SERVO_CHANNEL, HOCK_RELEASE_PWM)
             time.sleep(2)
 
-            # Reset servo to hold position for next use
             mavdrone.do_servo(HOCK_SERVO_CHANNEL, HOCK_HOLD_PWM)
             time.sleep(1)
 

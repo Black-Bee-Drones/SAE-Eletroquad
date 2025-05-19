@@ -30,6 +30,13 @@ from hook.states.constants import (
     ANGLE_D,
     ANGLE_OUTPUT_MIN,
     ANGLE_OUTPUT_MAX,
+    LINE_DETECTION_BLUE_COLOR_NAME,
+    LINE_DETECTION_RED_COLOR_NAME,
+    LINE_DETECTION_IMAGE_SOURCE,
+    LINE_DETECTION_SHOW_VISUALIZATION,
+    LINE_DETECTION_LINE_FOLLOWING_TITLE,
+    LINE_DETECTION_BLUE_SPACE,
+    LINE_DETECTION_RED_SPACE,
 )
 
 
@@ -43,17 +50,16 @@ class StartLineDetection(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Starting multi-color line detection process...")
 
-        # Kill any existing process with the same name first
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
-        # Start line detection node with both blue and red detection
         line_detection_cmd = (
             "ros2 run mirela_sdk line_detection_node "
             "--ros-args "
-            "-p line_colors:=blue,red "  
-            "-p show_visualization:=true "  
-            "-p image_source:=webcam "  
-            "-p visualization_name:='Line Following'"
+            f"-p line_colors:={LINE_DETECTION_BLUE_COLOR_NAME},{LINE_DETECTION_RED_COLOR_NAME} "
+            f"-p spaces:={LINE_DETECTION_BLUE_SPACE},{LINE_DETECTION_RED_SPACE} "
+            f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
+            f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
+            f"-p visualization_name:='{LINE_DETECTION_LINE_FOLLOWING_TITLE}'"
         )
 
         if not ProcessUtils.start_process(line_detection_cmd, LINE_DETECT_NODE_NAME):
@@ -61,7 +67,6 @@ class StartLineDetection(State):
             return ABORT
 
         yasmin.YASMIN_LOG_INFO("Line detection node started successfully.")
-        # Give node time to start
         sleep(2)
 
         return SUCCEED
@@ -86,10 +91,18 @@ class SetupLineStateRepublisher(State):
         self.should_continue = True
 
         # Define topic names
-        self.blue_center_state_topic = "/line_state/blue/center_x"
-        self.blue_angle_state_topic = "/line_state/blue/angle"
-        self.blue_center_setpoint_topic = "/blue/center_setpoint"
-        self.blue_angle_setpoint_topic = "/blue/angle_setpoint"
+        self.blue_center_state_topic = (
+            f"/line_state/{LINE_DETECTION_BLUE_COLOR_NAME}/center_x"
+        )
+        self.blue_angle_state_topic = (
+            f"/line_state/{LINE_DETECTION_BLUE_COLOR_NAME}/angle"
+        )
+        self.blue_center_setpoint_topic = (
+            f"/{LINE_DETECTION_BLUE_COLOR_NAME}/center_setpoint"
+        )
+        self.blue_angle_setpoint_topic = (
+            f"/{LINE_DETECTION_BLUE_COLOR_NAME}/angle_setpoint"
+        )
 
         # Define setpoint values
         self.center_setpoint = IMAGE_CENTER_X
@@ -97,7 +110,7 @@ class SetupLineStateRepublisher(State):
 
     def line_info_callback(self, msg: LineInfo):
         """Callback for LineInfo messages, republishes to separate topics"""
-        # Publish setpoints continuously with each state update
+  
         self.angle_setpoint_pub.publish(Float64(data=self.angle_setpoint))
         self.center_setpoint_pub.publish(Float64(data=self.center_setpoint))
 
@@ -128,7 +141,10 @@ class SetupLineStateRepublisher(State):
 
         # Subscribe to the original LineInfo topic
         self.blue_line_info_sub = self.node.create_subscription(
-            LineInfo, "/line_state/blue", self.line_info_callback, 10
+            LineInfo,
+            f"/line_state/{LINE_DETECTION_BLUE_COLOR_NAME}",
+            self.line_info_callback,
+            10,
         )
 
         # Store the topic names in blackboard for later states to use
@@ -154,7 +170,6 @@ class SetupLineStateRepublisher(State):
         angle_setpoint_msg.data = self.angle_setpoint
         self.angle_setpoint_pub.publish(angle_setpoint_msg)
 
-        # Give the republisher a moment to connect
         sleep(1)
 
         yasmin.YASMIN_LOG_INFO(
@@ -174,8 +189,8 @@ class StartPIDControllers(State):
         self.node = YasminNode.get_instance()
 
         # Only define control effort topics, others come from blackboard
-        self.vel_y_topic = "/blue/velocity_y"
-        self.angular_z_topic = "/blue/angular_velocity_z"
+        self.vel_y_topic = f"/{LINE_DETECTION_BLUE_COLOR_NAME}/velocity_y"
+        self.angular_z_topic = f"/{LINE_DETECTION_BLUE_COLOR_NAME}/angular_velocity_z"
 
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Starting PID controllers...")
@@ -186,7 +201,6 @@ class StartPIDControllers(State):
         blue_center_setpoint_topic = blackboard["blue_center_setpoint_topic"]
         blue_angle_setpoint_topic = blackboard["blue_angle_setpoint_topic"]
 
-        # Start PID controller for line center (lateral position control)
         center_pid_cmd = (
             "ros2 run pid_controller pid_controller_standalone "
             "--ros-args "
@@ -200,10 +214,9 @@ class StartPIDControllers(State):
             f"-p control_effort_topic:={self.vel_y_topic} "
             "-p publish_rate:=5.0 "
             "-p auto_start:=true "
-            "-r __node:=blue_center_pid"
+            f"-r __node:={LINE_DETECTION_BLUE_COLOR_NAME}_center_pid"
         )
 
-        # Start PID controller for line angle (heading control)
         angle_pid_cmd = (
             "ros2 run pid_controller pid_controller_standalone "
             "--ros-args "
@@ -217,10 +230,9 @@ class StartPIDControllers(State):
             f"-p control_effort_topic:={self.angular_z_topic} "
             "-p publish_rate:=5.0 "
             "-p auto_start:=true "
-            "-r __node:=blue_angle_pid"
+            f"-r __node:={LINE_DETECTION_BLUE_COLOR_NAME}_angle_pid"
         )
 
-        # Start PID controller processes
         if not ProcessUtils.start_process(center_pid_cmd, CENTER_PID_PROCESS):
             yasmin.YASMIN_LOG_ERROR("Failed to start center PID controller.")
             return ABORT
@@ -232,10 +244,9 @@ class StartPIDControllers(State):
             return ABORT
 
         yasmin.YASMIN_LOG_INFO("PID controllers started successfully.")
-        # Give controllers time to initialize
+   
         sleep(1)
 
-        # Store the topic names in blackboard for the follow state to use
         blackboard["vel_y_topic"] = self.vel_y_topic
         blackboard["angular_z_topic"] = self.angular_z_topic
 
@@ -268,7 +279,6 @@ class FollowLineWithDetection(State):
 
     def red_line_info_callback(self, msg: LineInfo):
         self.current_red_center_x = msg.center_x
-        # We track the center_x but can also use other properties if needed
 
     def red_detect_callback(self, msg: Bool):
         if msg.data:
@@ -298,9 +308,6 @@ class FollowLineWithDetection(State):
 
         self.mavdrone = blackboard["mavdrone"]
 
-        # Get topic names from blackboard
-        blue_center_state_topic = blackboard["blue_center_state_topic"]
-        blue_angle_state_topic = blackboard["blue_angle_state_topic"]
         vel_y_topic = blackboard["vel_y_topic"]
         angular_z_topic = blackboard["angular_z_topic"]
 
@@ -316,7 +323,7 @@ class FollowLineWithDetection(State):
         # Subscribe to line info for detection
         self.blue_line_info_sub = self.node.create_subscription(
             LineInfo,
-            "/line_state/blue",
+            f"/line_state/{LINE_DETECTION_BLUE_COLOR_NAME}",
             self.blue_line_info_callback,
             10,
         )
@@ -324,14 +331,14 @@ class FollowLineWithDetection(State):
         # Subscribe to red line info and detection status
         self.red_line_info_sub = self.node.create_subscription(
             LineInfo,
-            "/line_state/red",
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_line_info_callback,
             10,
         )
 
         self.red_detected_sub = self.node.create_subscription(
             Bool,
-            "/line_detect/red",
+            f"/line_detect/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_detect_callback,
             10,
         )
@@ -350,7 +357,7 @@ class FollowLineWithDetection(State):
 
         # Main control loop
         while time.time() - start_time < timeout and not self.red_detected:
-            # Use the PID controller outputs for velocity commands
+            # Use the PID controller outputs for velocity command
             self.mavdrone.offboard_velocity(
                 linear_x=FORWARD_SPEED,
                 linear_y=self.current_y_velocity,
@@ -410,7 +417,6 @@ class CleanupProcesses(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Cleaning up processes...")
 
-        # Kill the PID controller processes
         ProcessUtils.kill_process(CENTER_PID_PROCESS)
         ProcessUtils.kill_process(ANGLE_PID_PROCESS)
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
@@ -440,7 +446,6 @@ class FollowBlueLineWithRedDetection(StateMachine):
             transitions={SUCCEED: "SETUP_REPUBLISHER", ABORT: "CLEANUP_PROCESSES"},
         )
 
-        # Add the new republisher state
         self.add_state(
             "SETUP_REPUBLISHER",
             SetupLineStateRepublisher(),
