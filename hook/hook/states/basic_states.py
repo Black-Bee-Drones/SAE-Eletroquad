@@ -36,9 +36,9 @@ class Initialize(State):
 
             time.sleep(2)
 
-            # if not self.mavdrone.get_state.connected:
-            #     yasmin.YASMIN_LOG_ERROR("MAVROS not connected!")
-            #     return ABORT
+            if not self.mavdrone.get_state.connected:
+                yasmin.YASMIN_LOG_ERROR("MAVROS not connected!")
+                return ABORT
 
             yasmin.YASMIN_LOG_INFO("Drone Initialized Successfully.")
 
@@ -79,7 +79,7 @@ class Takeoff(State):
                     self.mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                     time.sleep(1)
                     return SUCCEED
-                if abs(alt - TAKEOFF_ALTITUDE) < 0.0:
+                if (alt - TAKEOFF_ALTITUDE) < 0.0:
                     self.mavdrone.offboard_velocity(0.0, 0.0, 0.1, 0.0)
                 else:
                     self.mavdrone.offboard_velocity(0.0, 0.0, -0.1, 0.0)
