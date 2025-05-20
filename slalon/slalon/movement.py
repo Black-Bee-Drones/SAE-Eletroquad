@@ -14,7 +14,7 @@ RIGHT = 3
 class MovementStateMachine(Node):
     def __init__(self):
         super().__init__("movement")
-        self.drone = MavDrone(self)
+        self.drone = MavDrone(self, False)
 
         self.state = 0
         self.side = LEFT  # controla de que lado o drone deve passar pela haste
@@ -48,13 +48,13 @@ class MovementStateMachine(Node):
             start = time.time()
             now = time.time()
             while now - start < 3:
-                self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.2, False)
+                self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.5, False)
                 rclpy.spin_once(self)
                 
                 if self.object_location != NOWHERE:
                     self.get_logger().info("Object found! Left side")
                     found = True
-                    self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, -0.2, time=now - start)
+                    self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, -0.5, time=now - start)
                     return self.object_location
                 now = time.time()
 
@@ -62,11 +62,11 @@ class MovementStateMachine(Node):
                 start = time.time()
                 now = time.time()
                 while now - start < 3:
-                    self.drone.offboard_velocity(0.0, 0.0, 0.0, -0.2)
+                    self.drone.offboard_velocity(0.0, 0.0, 0.0, -0.5)
                     rclpy.spin_once(self)
                     if self.object_location != NOWHERE:
                         self.get_logger().info("Object found! Right side")
-                        self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, 0.2, time=now - start)
+                        self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, 0.5, time=now - start)
                         return self.object_location
                     now = time.time()
 
@@ -83,20 +83,20 @@ class MovementStateMachine(Node):
             self.get_logger().info(f"LEFT object location: {self.object_location}")
             while self.object_location != CENTER:
                 self.get_logger().info("Moving drone to the left")
-                self.drone.offboard_velocity(0.0, 0.2, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, 0.5, 0.0, 0.0)
                 rclpy.spin_once(self)
 
         elif self.where_is_pipe == RIGHT:
             self.get_logger().info("RIGHT")
             while self.object_location != CENTER:
                 self.get_logger().info("Moving drone to the right")
-                self.drone.offboard_velocity(0.0, -0.2, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, -0.5, 0.0, 0.0)
                 rclpy.spin_once(self)
 
     def move_foward(self):
         while self.distance_to_object > 200:
             self.get_logger().info("Drone going foward")
-            self.drone.offboard_velocity(0.2, 0.0, 0.0, 0.0)
+            self.drone.offboard_velocity(1.0, 0.0, 0.0, 0.0)
             rclpy.spin_once(self)
 
         self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.0, False)
@@ -104,15 +104,15 @@ class MovementStateMachine(Node):
     def pass_by(self):
         if self.side == LEFT:
             self.get_logger().info("Moving drone to the left for 5 seconds")
-            self.drone.offboard_velocity_timer(0.0, 0.2, 0.0, 0.0, time=5)
+            self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=2.5)
             self.side = RIGHT
         else:
             self.get_logger().info("Moving drone to the right for 5 seconds")
-            self.drone.offboard_velocity_timer(0.0, -0.2, 0.0, 0.0, time=5)
+            self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=2.5)
             self.side = LEFT
 
         self.get_logger().info("Moving foward for 5 seconds")
-        self.drone.offboard_velocity_timer(0.2, 0.0, 0.0, 0.0, time=5)
+        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=2.5)
 
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
@@ -120,8 +120,8 @@ class MovementStateMachine(Node):
         rclpy.spin_once(self)
 
         if self.state == 0:
-            # self.drone.arm_takeoff(1.5)
-            sleep(5)
+            self.drone.arm_takeoff(1.5)
+            sleep(8)
             self.state = 1
             self.movement_st()
 

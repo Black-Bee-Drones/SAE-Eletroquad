@@ -20,7 +20,7 @@ BLACK = 4
 
 class DepthStateMachine(DepthMeasurement):
     def __init__(self):
-        super().__init__(2)
+        super().__init__(0)
 
 
         self.state = START

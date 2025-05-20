@@ -80,8 +80,8 @@ class DepthMeasurement(Node):
         #print(f'{distance:.2f}')
         #print(pixels_nonzero)
 
-        cv2.imshow("preview", frame)
-        cv2.imshow("result", result)
+       # cv2.imshow("preview", frame)
+       # cv2.imshow("result", result)
 
         if cv2.waitKey(1) == ord('q'):
             cv2.destroyAllWindows()
