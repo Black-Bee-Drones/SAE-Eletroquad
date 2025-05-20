@@ -42,8 +42,7 @@ class DepthMeasurement(Node):
     def depth_callback(self):
         #self.get_logger().info("depth cb")
         ret, frame = self.cap.read()
-        frame = cv2.flip(frame, 1)
-
+        
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
         mask = cv2.inRange(hsv, self.lower_range, self.upper_range)
@@ -101,7 +100,7 @@ class DepthMeasurement(Node):
         if not left and not right:
             msg.data = 0
             self.find_pub.publish(msg) #nenhum objeto encontrado
-        elif abs(left - right) <= 50:
+        elif abs(left - right) <= 10:
             msg.data = 1
             self.find_pub.publish(msg) #ta no centro
         elif left > right:
