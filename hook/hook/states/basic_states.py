@@ -109,7 +109,7 @@ class ReturnToLaunch(State):
 
         try:
             mavdrone.rtl(rtl_alt=RETURN_ALTITUDE)
-            return ABORT
+            return SUCCEED
         except Exception as e:
             yasmin.YASMIN_LOG_ERROR(f"RTL failed: {e}")
             return ABORT
