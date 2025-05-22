@@ -20,6 +20,7 @@ setup(
     entry_points={
         "console_scripts": [
             "mangalarga = hook.states.hang_the_hook_sm:main",
+            "test_takeoff_states = hook.tests.test_takeoff_states:main",
         ],
     },
 )
