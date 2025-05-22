@@ -55,6 +55,7 @@ class Takeoff(State):
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.mavdrone: MavDrone = None
+        self.node = YasminNode.get_instance()
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
@@ -72,10 +73,12 @@ class Takeoff(State):
             start_time = time.time()
             timeout = 30
             while time.time() - start_time < timeout:
+                rclpy.spin_once(self.node)
+
                 alt = self.mavdrone.get_rel_alt.data
                 yasmin.YASMIN_LOG_INFO(f"Current altitude: {alt:.2f}m")
 
-                diff = alt - TAKEOFF_ALTITUDE
+                diff = abs(alt) - TAKEOFF_ALTITUDE
                 if abs(diff) < 0.10:
                     yasmin.YASMIN_LOG_INFO("Takeoff altitude reached.")
                     self.mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
@@ -83,9 +86,9 @@ class Takeoff(State):
                     return SUCCEED
 
                 if diff < 0.0:
-                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.25 * diff, 0.0)
-                else:
                     self.mavdrone.offboard_velocity(0.0, 0.0, -0.25 * diff, 0.0)
+                else:
+                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.25 * diff, 0.0)
 
             yasmin.YASMIN_LOG_ERROR("Takeoff timed out.")
             return ABORT
@@ -127,11 +130,6 @@ class End(State):
     def execute(self, blackboard):
         yasmin.YASMIN_LOG_INFO("Mission ended. Cleaning up all processes...")
 
-        ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
-        ProcessUtils.kill_process(CENTER_PID_PROCESS)
-        ProcessUtils.kill_process(ANGLE_PID_PROCESS)
-        ProcessUtils.kill_process(CENTERING_PID_PROCESS)
-
         mavdrone: MavDrone = blackboard["mavdrone"]
         if mavdrone and mavdrone.get_state.armed:
             yasmin.YASMIN_LOG_INFO("Drone still armed, attempting to disarm...")
@@ -141,6 +139,11 @@ class End(State):
                 mavdrone.land()
             except Exception as e:
                 yasmin.YASMIN_LOG_ERROR(f"Failed to land: {e}")
+
+        ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
+        ProcessUtils.kill_process(CENTER_PID_PROCESS)
+        ProcessUtils.kill_process(ANGLE_PID_PROCESS)
+        ProcessUtils.kill_process(CENTERING_PID_PROCESS)
 
         yasmin.YASMIN_LOG_INFO("Mission cleanup completed.")
         return SUCCEED
