@@ -1,4 +1,5 @@
 import rclpy
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 import yasmin
 from yasmin import State, StateMachine, Blackboard
@@ -59,98 +60,112 @@ class StartRedLineDetection(State):
 
 
 class PerformDescent(State):
-    """Perform the descent operation while tracking the red line."""
-
+    """ 
+        Perform the descent operation based on height data from gps
+        while tracking the red line
+    
+        - descend with constant linear_z
+        - monitor the rel_alt
+        - stop when reach min_descend_altitude
+    
+    """
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.red_line_info_sub = None
-        self.red_detected_sub = None
-        self.max_area = 0
-        self.last_area = 0
-        self.last_detected = False
-        self.area_decreasing_count = 0
+        self.red_detected_sub = 0
+        self.max_proximity_height = 0
+        self.last_height = 0
+        self.last_detected = True
+        self.decreasing_height_counter = 0
+        # Pensei em adicionar as QoSProfiles para assegurar que não vamos perder nenhum dado do gps
+        self.qos_profile = QoSProfile(
+           reliability = QoSReliabilityPolicy.BEST_EFFORT,
+           history = QoSHistoryPolicy.KEEP_LAST,
+           depth=10
+        )
         self.node = YasminNode.get_instance()
-
-    def red_line_info_callback(self, msg: LineInfo):
-        """We track area information from the red line to determine proximity"""
-        # Note: LineInfo doesn't currently include area, but this could be added
-        # Here we're just using the callback to know we're still receiving data
-        pass
-
-    def red_detect_callback(self, msg: Bool):
-        """Use the detection status to track if we're still seeing the red line"""
-        self.last_detected = msg.data
-
+    
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
-            yasmin.YASMIN_LOG_ERROR("MavDrone not available in PerformDescent state.")
+            yasmin.YASMIN_LOG_ERROR("MavDrone not available in PerformDescet state.")
             return ABORT
-
+        
         mavdrone = blackboard["mavdrone"]
 
-        yasmin.YASMIN_LOG_INFO("Descending towards hook...")
-        self.max_area = 0
-        self.last_area = 0
+        yasmin.YASMIN_LOG_INFO("Descending towards red hose...")
+
+        self.min_height = MIN_DESCEND_ALTITUDE
+        self.last_height = 0
         self.last_detected = False
-        self.area_decreasing_count = 0
+        self.height_decreasing_count = 0
 
         self.red_detected_sub = self.node.create_subscription(
             Bool,
             f"/line_detect/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_detect_callback,
             10,
+            qos_profile=self.qos_profile
         )
 
         self.red_line_info_sub = self.node.create_subscription(
             LineInfo,
-            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
+            f"/line/state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_line_info_callback,
             10,
+            qos_profile=self.qos_profile
         )
 
         start_time = time.time()
         timeout = 30
         consecutive_not_detected = 0
-        max_consecutive_not_detected = 5  # Allow brief detection losses
+        max_consecutive_not_detected = 7
 
-        # Main descent loop
+
+        # Main descend loop 
         while time.time() - start_time < timeout:
             rel_alt = mavdrone.get_rel_alt.data
 
-            # Check if we're still detected - if we lose detection too long, we've likely gone too far down
+            # Check if we're still detecting the hose 
+            # If lose it up for too long, we've likely gone too far down
             if not self.last_detected:
                 consecutive_not_detected += 1
                 yasmin.YASMIN_LOG_DEBUG(
-                    f"Red line not detected: {consecutive_not_detected}/{max_consecutive_not_detected}"
+                    f"Red hose not detected: {consecutive_not_detected} out {max_consecutive_not_detected} tries"
                 )
             else:
                 consecutive_not_detected = 0
-                yasmin.YASMIN_LOG_DEBUG(f"Red line detected, altitude: {rel_alt}m")
-
+                yasmin.YASMIN_LOG_DEBUG(f"Red line detected, altitude: {rel_alt:.3f}m")
+            
             if consecutive_not_detected > max_consecutive_not_detected:
                 yasmin.YASMIN_LOG_INFO(
-                    "Red line no longer detected consistently, likely at drop position."
-                )
+                    "Red hose no longer detected consistently, likely at drop position."
+                    )
                 self._cleanup_subscribers()
                 return SUCCEED
             
             mavdrone.offboard_velocity(
-                linear_x=0.0, linear_y=0.0, linear_z=DESCEND_SPEED, angular_z=0.0
+                linear_x = 0.0,
+                linear_y = 0.0,
+                linear_z = DESCEND_SPEED,
+                angular_z = 0.0
             )
 
             rclpy.spin_once(self.node, timeout_sec=0.05)
 
             if rel_alt < MIN_DESCEND_ALTITUDE:
-                yasmin.YASMIN_LOG_INFO(
-                    f"Reached minimum safe altitude ({MIN_DESCEND_ALTITUDE}m), ready to drop hook."
+                yasmin.YASMIN_LOG_WARN(
+                    f"Reached the mininum safe altitude ({MIN_DESCEND_ALTITUDE}m), ready to drop the hook."
                 )
                 mavdrone.offboard_velocity(
-                    linear_x=0.0, linear_y=0.0, linear_z=0.0, angular_z=0.0
-                )
+                linear_x = 0.0,
+                linear_y = 0.0,
+                linear_z = 0.0,
+                angular_z = 0.0
+            )
                 self._cleanup_subscribers()
                 return SUCCEED
 
-        yasmin.YASMIN_LOG_ERROR("Failed to descend to hook (timeout).")
+        yasmin.YASMIN_LOG_ERROR("Failed to descend to hook (timeout)")
         self._cleanup_subscribers()
         return ABORT
 
