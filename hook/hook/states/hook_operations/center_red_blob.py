@@ -13,7 +13,6 @@ from time import sleep
 import time
 
 from hook.states.constants import (
-    CENTERING_THRESHOLD_RADIUS,
     CENTERING_CONFIRMATIONS,
     LINE_DETECT_NODE_NAME,
     CENTERING_PID_PROCESS,
@@ -62,6 +61,75 @@ class StartRedLineDetection(State):
         )
         sleep(2)
 
+        return SUCCEED
+
+
+class SetupRedLineStateRepublisher(State):
+    """
+    Sets up publishers and subscribers to republish the red line's center_x value to a separate topic.
+    Also publishes the setpoint value continuously alongside the state.
+    """
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+        self.node = YasminNode.get_instance()
+        self.red_line_info_sub = None
+        self.red_center_pub = None
+        self.center_setpoint_pub = None
+        self.should_continue = True
+
+        self.red_center_state_topic = (
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_x"
+        )
+        self.red_center_setpoint_topic = (
+            f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
+        )
+        self.center_setpoint = IMAGE_CENTER_X
+
+    def line_info_callback(self, msg: LineInfo):
+        """Callback for LineInfo messages, republishes center_x and setpoint"""
+        self.center_setpoint_pub.publish(Float64(data=self.center_setpoint))
+        self.red_center_pub.publish(Float64(data=msg.center_x))
+
+    def execute(self, blackboard: Blackboard):
+        yasmin.YASMIN_LOG_INFO(
+            "Setting up red line state republisher and setpoint publisher..."
+        )
+
+        # Create publisher for the center_x state
+        self.red_center_pub = self.node.create_publisher(
+            Float64, self.red_center_state_topic, 10
+        )
+        # Create publisher for setpoint
+        self.center_setpoint_pub = self.node.create_publisher(
+            Float64, self.red_center_setpoint_topic, 10
+        )
+        # Subscribe to the original LineInfo topic
+        self.red_line_info_sub = self.node.create_subscription(
+            LineInfo,
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
+            self.line_info_callback,
+            10,
+        )
+        # Store the topic names in blackboard for later states to use
+        blackboard["red_center_state_topic"] = self.red_center_state_topic
+        blackboard["red_center_setpoint_topic"] = self.red_center_setpoint_topic
+        # Store subscribers in blackboard for cleanup later
+        if "subscribers_to_clean" not in blackboard:
+            blackboard["subscribers_to_clean"] = []
+        blackboard["subscribers_to_clean"].append(
+            {"node": self.node, "subscription": self.red_line_info_sub}
+        )
+        # Publish initial setpoint before any callbacks
+        center_setpoint_msg = Float64()
+        center_setpoint_msg.data = self.center_setpoint
+        self.center_setpoint_pub.publish(center_setpoint_msg)
+        sleep(1)
+        yasmin.YASMIN_LOG_INFO(
+            f"Red line state republisher and setpoint publisher set up successfully.\n"
+            f"State topic: {self.red_center_state_topic}\n"
+            f"Setpoint topic: {self.red_center_setpoint_topic}"
+        )
         return SUCCEED
 
 
@@ -116,7 +184,7 @@ class StartCenteringPID(State):
             return ABORT
 
         yasmin.YASMIN_LOG_INFO("Red centering PID controller started successfully.")
-        sleep(1) 
+        sleep(1)
 
         blackboard["red_center_state_topic"] = self.red_center_state_topic
         blackboard["red_center_setpoint_topic"] = self.red_center_setpoint_topic
@@ -138,22 +206,12 @@ class PerformCentering(State):
         self.last_error_x = 0
         self.node = YasminNode.get_instance()
 
-    def red_line_info_callback(self, msg: LineInfo):
-        """Callback for red line state updates"""
-        # Calculate error from center of image
-        error_x = msg.center_x - IMAGE_CENTER_X
-
-        # For this state, we consider the line centered when it's within the threshold
-        if abs(error_x) < CENTERING_THRESHOLD_RADIUS:
+    def control_effort_y_callback(self, msg: Float64):
+        self.current_y_velocity = msg.data
+        if self.current_y_velocity <= 0.05:
             self.centering_confirmations += 1
         else:
             self.centering_confirmations = 0
-
-        self.last_error_x = error_x
-        self.current_red_center_x = msg.center_x
-
-    def control_effort_y_callback(self, msg: Float64):
-        self.current_y_velocity = msg.data
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
@@ -175,13 +233,6 @@ class PerformCentering(State):
         self.last_error_x = 0
         self.current_y_velocity = 0.0
 
-        self.red_line_info_sub = self.node.create_subscription(
-            LineInfo,
-            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
-            self.red_line_info_callback,
-            10,
-        )
-
         self.control_effort_y_sub = self.node.create_subscription(
             Float64, red_vel_y_topic, self.control_effort_y_callback, 10
         )
@@ -201,6 +252,13 @@ class PerformCentering(State):
             rclpy.spin_once(self.node, timeout_sec=0.05)
 
             if self.centering_confirmations >= CENTERING_CONFIRMATIONS:
+                mavdrone.offboard_velocity_timer(
+                    linear_x=0.0,
+                    linear_y=0.0,
+                    linear_z=0.0,
+                    angular_z=0.0,
+                    time=2.0,
+                )
                 yasmin.YASMIN_LOG_INFO("Red blob centered.")
                 self._cleanup_subscribers()
                 return SUCCEED
@@ -250,6 +308,12 @@ class CenterRedBlob(StateMachine):
         self.add_state(
             "START_RED_LINE_DETECTION",
             StartRedLineDetection(),
+            transitions={SUCCEED: "START_CENTERING_PID", ABORT: "CLEANUP_PROCESSES"},
+        )
+
+        self.add_state(
+            "SETUP_RED_LINE_STATE_REPUBLISHER",
+            SetupRedLineStateRepublisher(),
             transitions={SUCCEED: "START_CENTERING_PID", ABORT: "CLEANUP_PROCESSES"},
         )
 
