@@ -14,7 +14,7 @@ import time
 
 from hook.states.constants import (
     FORWARD_SPEED,
-    MIN_RED_AREA_CONFIRMATIONS,
+    MIN_RED_COUNT_CONFIRMATIONS,
     LINE_DETECT_NODE_NAME,
     CENTER_PID_PROCESS,
     ANGLE_PID_PROCESS,
@@ -90,7 +90,6 @@ class SetupLineStateRepublisher(State):
         self.angle_setpoint_pub = None
         self.should_continue = True
 
-        # Define topic names
         self.blue_center_state_topic = (
             f"/line_state/{LINE_DETECTION_BLUE_COLOR_NAME}/center_x"
         )
@@ -110,7 +109,7 @@ class SetupLineStateRepublisher(State):
 
     def line_info_callback(self, msg: LineInfo):
         """Callback for LineInfo messages, republishes to separate topics"""
-  
+
         self.angle_setpoint_pub.publish(Float64(data=self.angle_setpoint))
         self.center_setpoint_pub.publish(Float64(data=self.center_setpoint))
 
@@ -244,7 +243,7 @@ class StartPIDControllers(State):
             return ABORT
 
         yasmin.YASMIN_LOG_INFO("PID controllers started successfully.")
-   
+
         sleep(1)
 
         blackboard["vel_y_topic"] = self.vel_y_topic
@@ -259,10 +258,8 @@ class FollowLineWithDetection(State):
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT, "red_detected"])
         self.mavdrone = None
-        self.red_area_confirmations = 0
+        self.red_count_confirmations = 0
         self.red_detected = False
-        self.blue_line_info_sub = None
-        self.red_line_info_sub = None
         self.red_detected_sub = None
         self.control_effort_y_sub = None
         self.control_effort_angular_z_sub = None
@@ -273,24 +270,17 @@ class FollowLineWithDetection(State):
         self.current_angular_z = 0.0
         self.node = YasminNode.get_instance()
 
-    def blue_line_info_callback(self, msg: LineInfo):
-        self.current_blue_center_x = msg.center_x
-        self.current_blue_angle = msg.angle
-
-    def red_line_info_callback(self, msg: LineInfo):
-        self.current_red_center_x = msg.center_x
-
     def red_detect_callback(self, msg: Bool):
         if msg.data:
-            self.red_area_confirmations += 1
+            self.red_count_confirmations += 1
         else:
-            self.red_area_confirmations = 0  # Reset count if detection lost
+            self.red_count_confirmations = 0  # Reset count if detection lost
 
         # Check if we've detected the red line consistently
-        if self.red_area_confirmations >= MIN_RED_AREA_CONFIRMATIONS:
+        if self.red_count_confirmations >= MIN_RED_COUNT_CONFIRMATIONS:
             self.red_detected = True
             yasmin.YASMIN_LOG_INFO(
-                f"Red hose detection confirmed after {self.red_area_confirmations} detections"
+                f"Red hose detection confirmed after {self.red_count_confirmations} detections"
             )
 
     def control_effort_y_callback(self, msg: Float64):
@@ -312,29 +302,13 @@ class FollowLineWithDetection(State):
         angular_z_topic = blackboard["angular_z_topic"]
 
         yasmin.YASMIN_LOG_INFO("Following blue line with red detection...")
-        self.red_area_confirmations = 0
+        self.red_count_confirmations = 0
         self.red_detected = False
         self.current_blue_center_x = None
         self.current_blue_angle = None
         self.current_red_center_x = None
         self.current_y_velocity = 0.0
         self.current_angular_z = 0.0
-
-        # Subscribe to line info for detection
-        self.blue_line_info_sub = self.node.create_subscription(
-            LineInfo,
-            f"/line_state/{LINE_DETECTION_BLUE_COLOR_NAME}",
-            self.blue_line_info_callback,
-            10,
-        )
-
-        # Subscribe to red line info and detection status
-        self.red_line_info_sub = self.node.create_subscription(
-            LineInfo,
-            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
-            self.red_line_info_callback,
-            10,
-        )
 
         self.red_detected_sub = self.node.create_subscription(
             Bool,
@@ -384,15 +358,6 @@ class FollowLineWithDetection(State):
         """Clean up all subscribers to avoid resource leaks"""
         yasmin.YASMIN_LOG_INFO("Cleaning up subscribers...")
 
-        # Destroy all subscribers
-        if self.blue_line_info_sub:
-            self.node.destroy_subscription(self.blue_line_info_sub)
-            self.blue_line_info_sub = None
-
-        if self.red_line_info_sub:
-            self.node.destroy_subscription(self.red_line_info_sub)
-            self.red_line_info_sub = None
-
         if self.red_detected_sub:
             self.node.destroy_subscription(self.red_detected_sub)
             self.red_detected_sub = None
@@ -439,7 +404,6 @@ class FollowBlueLineWithRedDetection(StateMachine):
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT, "red_detected"])
 
-        # Define states
         self.add_state(
             "START_LINE_DETECTION",
             StartLineDetection(),
