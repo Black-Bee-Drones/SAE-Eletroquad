@@ -1,14 +1,18 @@
 # Mission Parameters
 TAKEOFF_ALTITUDE = 3.0
+
 FORWARD_SPEED = 0.5  # m/s
-DESCEND_SPEED = -0.2  # m/s (negative for downward)
 MIN_BLUE_LINE_DETECTIONS = 20  # Consecutive detections to confirm line
+
 MIN_RED_AREA_THRESHOLD = 5000  # Pixel area to consider red blob significant
 MIN_RED_AREA_CONFIRMATIONS = 20  # Consecutive frames above threshold
 CENTERING_THRESHOLD_RADIUS = 25  # Pixels from center
 CENTERING_CONFIRMATIONS = 5  # Consecutive frames within threshold
 MAX_DESCEND_AREA_FACTOR = 0.95  # Descend until area is 95% of max seen
 MIN_DESCEND_ALTITUDE = 2.15  # Failsafe altitude during descent
+DESCEND_SPEED = -0.2  # m/s (negative for downward)
+DESCEND_TIMEOUT = 30  # Timeout for descent in seconds
+
 HOCK_SERVO_CHANNEL = 9  # Example channel
 HOCK_RELEASE_PWM = 1900  # Example PWM
 HOCK_HOLD_PWM = 1100  # Example PWM

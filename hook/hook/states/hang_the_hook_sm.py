@@ -12,7 +12,7 @@ from hook.states import (
     SearchBlueLine,
     FollowBlueLineWithRedDetection,
     CenterRedBlob,
-    DescendToHook,
+    PerformDescent,
     ReleaseHook,
     ReturnToLaunch,
     End,
@@ -26,7 +26,7 @@ class HangTheHookSM(StateMachine):
         self.add_state(
             "INITIALIZE",
             Initialize(),
-            transitions={SUCCEED: "TAKEOFF", ABORT: ABORT},
+            transitions={SUCCEED: "TAKEOFF", ABORT: "END"},
         )
 
         self.add_state(
@@ -58,7 +58,7 @@ class HangTheHookSM(StateMachine):
 
         self.add_state(
             "DESCEND_TO_HOOK",
-            DescendToHook(),
+            PerformDescent(),
             transitions={SUCCEED: "RELEASE_HOOK", ABORT: "RETURN_TO_LAUNCH"},
         )
 

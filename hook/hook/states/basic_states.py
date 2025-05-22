@@ -34,7 +34,7 @@ class Initialize(State):
             blackboard["mavdrone"] = MavDrone(node=YasminNode.get_instance())
             self.mavdrone: MavDrone = blackboard["mavdrone"]
 
-            time.sleep(2)
+            time.sleep(3)
 
             if not self.mavdrone.get_state.connected:
                 yasmin.YASMIN_LOG_ERROR("MAVROS not connected!")
@@ -70,19 +70,22 @@ class Takeoff(State):
             time.sleep(3)
 
             start_time = time.time()
-            timeout = 30  # seconds
+            timeout = 30
             while time.time() - start_time < timeout:
                 alt = self.mavdrone.get_rel_alt.data
                 yasmin.YASMIN_LOG_INFO(f"Current altitude: {alt:.2f}m")
-                if abs(alt - TAKEOFF_ALTITUDE) < 0.2:
+
+                diff = alt - TAKEOFF_ALTITUDE
+                if abs(diff) < 0.10:
                     yasmin.YASMIN_LOG_INFO("Takeoff altitude reached.")
                     self.mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                     time.sleep(1)
                     return SUCCEED
-                if (alt - TAKEOFF_ALTITUDE) < 0.0:
-                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.1, 0.0)
+
+                if diff < 0.0:
+                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.25 * diff, 0.0)
                 else:
-                    self.mavdrone.offboard_velocity(0.0, 0.0, -0.1, 0.0)
+                    self.mavdrone.offboard_velocity(0.0, 0.0, -0.25 * diff, 0.0)
 
             yasmin.YASMIN_LOG_ERROR("Takeoff timed out.")
             return ABORT
@@ -123,7 +126,7 @@ class End(State):
 
     def execute(self, blackboard):
         yasmin.YASMIN_LOG_INFO("Mission ended. Cleaning up all processes...")
-        
+
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
         ProcessUtils.kill_process(CENTER_PID_PROCESS)
         ProcessUtils.kill_process(ANGLE_PID_PROCESS)
