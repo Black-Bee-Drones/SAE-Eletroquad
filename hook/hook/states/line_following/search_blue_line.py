@@ -1,4 +1,5 @@
 import rclpy
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 import yasmin
 from yasmin import State, StateMachine, Blackboard
@@ -33,6 +34,8 @@ class StartBlueLineDetection(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Starting blue line detection process...")
 
+        blackboard["line_detection_failed"] = bool()
+
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
         line_detection_cmd = (
@@ -49,11 +52,13 @@ class StartBlueLineDetection(State):
             line_detection_cmd, LINE_DETECT_NODE_NAME, False
         ):
             yasmin.YASMIN_LOG_ERROR("Failed to start blue line detection process.")
+            blackboard["line_detection_failed"] = True
             return ABORT
 
         yasmin.YASMIN_LOG_INFO(
             "Line detection node started successfully for blue line search."
         )
+        blackboard["line_detection_failed"] = False
         sleep(2)
 
         return SUCCEED
@@ -68,6 +73,11 @@ class SearchForBlueLine(State):
         self.line_detected_sub = None
         self.detection_count = 0
         self.line_detected = False
+        self.qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10,
+        )
         self.node = YasminNode.get_instance()
 
     def line_detect_callback(self, msg: Bool):
@@ -98,6 +108,7 @@ class SearchForBlueLine(State):
             f"/line_detect/{LINE_DETECTION_BLUE_COLOR_NAME}",
             self.line_detect_callback,
             10,
+            qos_profile=self.qos_profile,
         )
 
         start_time = time.time()
@@ -127,6 +138,7 @@ class SearchForBlueLine(State):
             self.node.destroy_subscription(self.line_detected_sub)
             self.line_detected_sub = None
 
+        blackboard["line_detection_failed"] = True
         return ABORT
 
 
@@ -140,6 +152,10 @@ class CleanupResources(State):
         yasmin.YASMIN_LOG_INFO("Cleaning up SearchBlueLine resources...")
 
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
+
+        if blackboard["line_detection_failed"]:
+            yasmin.YASMIN_LOG_ERROR("Line detection failed. Returning to launch.")
+            return ABORT
 
         yasmin.YASMIN_LOG_INFO("SearchBlueLine cleanup completed")
         return SUCCEED
@@ -166,7 +182,10 @@ class SearchBlueLine(StateMachine):
         self.add_state(
             "CLEANUP_RESOURCES",
             CleanupResources(),
-            transitions={SUCCEED: SUCCEED},
+            transitions={
+                SUCCEED: SUCCEED,
+                ABORT: ABORT,
+            },
         )
 
     def execute(self, blackboard):
