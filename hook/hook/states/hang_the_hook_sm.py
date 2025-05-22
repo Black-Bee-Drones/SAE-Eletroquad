@@ -75,7 +75,7 @@ class HangTheHookSM(StateMachine):
             "RETURN_TO_LAUNCH",
             ReturnToLaunch(),
             transitions={SUCCEED: "END", ABORT: "END"},
-        )  # Go to End even if RTL fails
+        )  
 
         self.add_state("END", End(), transitions={SUCCEED: SUCCEED})
 
