@@ -37,6 +37,7 @@ from hook.states.constants import (
     LINE_DETECTION_LINE_FOLLOWING_TITLE,
     LINE_DETECTION_BLUE_SPACE,
     LINE_DETECTION_RED_SPACE,
+    LINE_DETECTION_METHOD
 )
 
 
@@ -59,6 +60,7 @@ class StartLineDetection(State):
             f"-p spaces:={LINE_DETECTION_BLUE_SPACE},{LINE_DETECTION_RED_SPACE} "
             f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
             f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
+            f"-p method:={LINE_DETECTION_METHOD} "
             f"-p visualization_name:='{LINE_DETECTION_LINE_FOLLOWING_TITLE}'"
         )
 
