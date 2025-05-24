@@ -11,6 +11,8 @@ from std_msgs.msg import Int8
 
 #Cores traves: Preto fosco, Azul escuro, Rosa claro, Vermelho
 
+#filtro preto ta uma bosta
+
 class DepthMeasurement(Node):
     def __init__(self, cap=0):
         super().__init__("depth_st")
@@ -20,9 +22,6 @@ class DepthMeasurement(Node):
         self.find_pub = self.create_publisher(Int8, "where_is_it", 10)
 
         self.cap = cv2.VideoCapture(cap)
-
-        #self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        #self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
         #Numero de pixels filtrado vezes a distancia da camera à esse numero de pixels
         self.const: float = 69*97 
@@ -40,10 +39,11 @@ class DepthMeasurement(Node):
 
         
     def depth_callback(self):
-        #self.get_logger().info("depth cb")
         ret, frame = self.cap.read()
         
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         mask = cv2.inRange(hsv, self.lower_range, self.upper_range)
         if self.lower_range2 is not None and self.upper_range2 is not None:
@@ -53,22 +53,70 @@ class DepthMeasurement(Node):
         mask = cv2.dilate(mask, np.ones((11, 11), np.uint8), iterations=1)
         mask = cv2.erode(mask, np.ones((7, 7), np.uint8), iterations=1)
 
+
         mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, np.ones((8, 8), np.uint8))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((8, 8), np.uint8))
+                
 
-        #Matriz do tamanho da imagem preenchida com zeros
-        roi = np.zeros_like(frame)
+        # count = 0
+        # begin = -1
+        # for i in range(0, 640):
+        #     if np.count_nonzero(mask[:, i]) > 288:
+        #         if count == 0:
+        #             begin = i
+        #         count += 1
+        #     else:
+        #         if count > 32:
+        #             break
+        #         count = 0
+        #         begin = -1
+        # pipe_area = np.zeros_like(mask)
+        # pipe_area[:, begin:begin+count] = 255
+
+        # Calcular quantos pixels brancos existem em cada coluna
+        col_sums = np.count_nonzero(mask, axis=0)  # shape: (640,)
+
+        # Criar máscara booleana das colunas que passam do limite (60% da altura = 288)
+        valid_cols = col_sums > 288
+
+        # Encontrar sequências contínuas de colunas válidas
+        from itertools import groupby
+        from operator import itemgetter
+
+        indices = np.where(valid_cols)[0]
+        groups = [list(g) for k, g in groupby(enumerate(indices), lambda x: x[0] - x[1])]
+
+        # Encontrar o maior grupo contínuo (maior faixa de colunas válidas)
+        longest_group = max(groups, key=len, default=[])
+
+        pipe_area = np.zeros_like(mask)
+
+        if len(longest_group) > 32:
+            begin = longest_group[0][1]
+            end = longest_group[-1][1]
+            width = longest_group[-1][0] + 1
+            pipe_area[:, begin:end] = 255
+            print(width)
+
+
+        cv2.imshow("pipe_area", pipe_area)
+
+        #Matriz do tamanho da mascara preenchida com zeros
+        roi = np.zeros_like(mask)
 
         #Define uma linha no centro dessa matriz com valor 255, que será a área de detecção
         roi[240:241,:] = 255
 
-        result = cv2.bitwise_and(frame, roi, mask=mask)
+        #result = cv2.bitwise_and(frame, roi, mask=mask)
+        self.gray = cv2.bitwise_and(pipe_area, roi)
+        cv2.imshow("result", self.gray)
 
         #Conversão para grayscale para que a imagem possua apenas 1 canal
-        self.gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+        #self.gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
         #Conta o numero de pixels detectados pelo filtro de cor dentro da area roi
         pixels_nonzero = np.count_nonzero(self.gray)
+        #print(pixels_nonzero)
 
         #Regra de 3 para calcular a distancia baseado na variação do número de pixels
         distance = self.const / pixels_nonzero if pixels_nonzero != 0 else 0.0
@@ -80,8 +128,8 @@ class DepthMeasurement(Node):
         #print(f'{distance:.2f}')
         #print(pixels_nonzero)
 
-       # cv2.imshow("preview", frame)
-       # cv2.imshow("result", result)
+        cv2.imshow("preview", frame)
+        #cv2.imshow("result", result)
 
         if cv2.waitKey(1) == ord('q'):
             cv2.destroyAllWindows()
@@ -111,3 +159,27 @@ class DepthMeasurement(Node):
             self.find_pub.publish(msg) #ta mais pra direita
         
 
+def main():
+    rclpy.init()
+    lower_red1 = np.array([0, 175, 117])
+    upper_red1 = np.array([20, 255, 203])
+    lower_red2 = np.array([169, 128, 140])
+    upper_red2 = np.array([179, 255, 223])
+
+    lower_black = np.array([99, 10, 0])
+    upper_black = np.array([109, 115, 130])
+    dp = DepthMeasurement(2)
+    #dp.set_ranges(lower_red1, upper_red1, lower_red2, upper_red2)
+    dp.set_ranges(lower_black, upper_black)
+
+    while True:
+        dp.depth_callback()
+
+        if cv2.waitKey(1) == ord('q'):
+            cv2.destroyAllWindows()
+            break
+    rclpy.shutdown()
+
+
+
+main()
