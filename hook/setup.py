@@ -21,6 +21,7 @@ setup(
         "console_scripts": [
             "mangalarga = hook.states.hang_the_hook_sm:main",
             "test_takeoff_states = hook.tests.test_takeoff_states:main",
+            "test_follow_blue_line_pid = hook.tests.test_follow_blue_line_pid:main",
         ],
     },
 )
