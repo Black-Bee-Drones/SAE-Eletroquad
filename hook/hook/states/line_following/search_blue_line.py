@@ -21,6 +21,7 @@ from hook.states.constants import (
     LINE_DETECTION_IMAGE_SOURCE,
     LINE_DETECTION_SHOW_VISUALIZATION,
     LINE_DETECTION_BLUE_SEARCH_TITLE,
+    LINE_DETECTION_METHOD
 )
 
 
@@ -43,6 +44,7 @@ class StartBlueLineDetection(State):
             "--ros-args "
             f"-p line_colors:={LINE_DETECTION_BLUE_COLOR_NAME} "
             f"-p spaces:={LINE_DETECTION_BLUE_SPACE} "
+            f"-p method:={LINE_DETECTION_METHOD} "
             f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
             f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
             f"-p visualization_name:='{LINE_DETECTION_BLUE_SEARCH_TITLE}'"
@@ -107,7 +109,6 @@ class SearchForBlueLine(State):
             Bool,
             f"/line_detect/{LINE_DETECTION_BLUE_COLOR_NAME}",
             self.line_detect_callback,
-            10,
             qos_profile=self.qos_profile,
         )
 
@@ -146,7 +147,7 @@ class CleanupResources(State):
     """Clean up resources after the search process."""
 
     def __init__(self):
-        super().__init__(outcomes=[SUCCEED])
+        super().__init__(outcomes=[SUCCEED, ABORT])
 
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Cleaning up SearchBlueLine resources...")
