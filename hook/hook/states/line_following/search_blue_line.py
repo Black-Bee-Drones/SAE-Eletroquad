@@ -13,7 +13,7 @@ from time import sleep
 import time
 
 from hook.states.constants import (
-    FORWARD_SPEED,
+    FORWARD_SPEED_SEARCH_BLUE_LINE,
     MIN_BLUE_LINE_DETECTIONS,
     LINE_DETECT_NODE_NAME,
     LINE_DETECTION_BLUE_COLOR_NAME,
@@ -117,7 +117,7 @@ class SearchForBlueLine(State):
 
         while time.time() - start_time < timeout:
             self.mavdrone.offboard_velocity(
-                linear_x=FORWARD_SPEED, linear_y=0.0, linear_z=0.0, angular_z=0.0
+                linear_x=FORWARD_SPEED_SEARCH_BLUE_LINE, linear_y=0.0, linear_z=0.0, angular_z=0.0
             )
 
             rclpy.spin_once(YasminNode.get_instance(), timeout_sec=0.05)

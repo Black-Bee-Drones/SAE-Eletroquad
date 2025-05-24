@@ -13,7 +13,7 @@ from time import sleep
 import time
 
 from hook.states.constants import (
-    FORWARD_SPEED,
+    FORWARD_SPEED_FOLLOW_BLUE_LINE,
     MIN_RED_COUNT_CONFIRMATIONS,
     LINE_DETECT_NODE_NAME,
     CENTER_PID_PROCESS,
@@ -335,7 +335,7 @@ class FollowLineWithDetection(State):
         while time.time() - start_time < timeout and not self.red_detected:
             # Use the PID controller outputs for velocity command
             self.mavdrone.offboard_velocity(
-                linear_x=FORWARD_SPEED,
+                linear_x=FORWARD_SPEED_FOLLOW_BLUE_LINE,
                 linear_y=self.current_y_velocity,
                 linear_z=0.0,
                 angular_z=self.current_angular_z,
