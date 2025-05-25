@@ -161,30 +161,30 @@ class DepthMeasurement(Node):
             self.find_pub.publish(msg) #ta mais pra direita
         
 
-def main():
-    rclpy.init()
-    lower_red1 = np.array([0, 175, 117])
-    upper_red1 = np.array([20, 255, 203])
-    lower_red2 = np.array([135, 137, 59])
-    upper_red2 = np.array([179, 255, 255])
+# def main():
+#     rclpy.init()
+#     lower_red1 = np.array([0, 175, 117])
+#     upper_red1 = np.array([20, 255, 203])
+#     lower_red2 = np.array([135, 137, 59])
+#     upper_red2 = np.array([179, 255, 255])
 
-    lower_blue = np.array([80, 140, 86])
-    upper_blue = np.array([123, 255, 202])
+#     lower_blue = np.array([80, 140, 86])
+#     upper_blue = np.array([123, 255, 202])
 
-    lower_black = np.array([79, 67, 0])
-    upper_black = np.array([137, 181, 62])
-    dp = DepthMeasurement(2)
-    #dp.set_ranges(lower_red1, upper_red1, lower_red2, upper_red2)
-    dp.set_ranges(lower_black, upper_black)
-    #dp.set_ranges(lower_blue, upper_blue)
-    while True:
-        dp.depth_callback()
+#     lower_black = np.array([79, 67, 0])
+#     upper_black = np.array([137, 181, 62])
+#     dp = DepthMeasurement(2)
+#     #dp.set_ranges(lower_red1, upper_red1, lower_red2, upper_red2)
+#     dp.set_ranges(lower_black, upper_black)
+#     #dp.set_ranges(lower_blue, upper_blue)
+#     while True:
+#         dp.depth_callback()
 
-        if cv2.waitKey(1) == ord('q'):
-            cv2.destroyAllWindows()
-            break
-    rclpy.shutdown()
+#         if cv2.waitKey(1) == ord('q'):
+#             cv2.destroyAllWindows()
+#             break
+#     rclpy.shutdown()
 
 
 
-main()
+# main()
