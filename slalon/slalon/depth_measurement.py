@@ -24,7 +24,7 @@ class DepthMeasurement(Node):
         self.cap = cv2.VideoCapture(cap)
 
         #Numero de pixels filtrado vezes a distancia da camera à esse numero de pixels
-        self.const: float = 69*97 
+        self.const: float = 69*100 
         self.lower_range = np.array([115, 62, 85]) 
         self.upper_range = np.array([179, 255, 255])
         self.lower_range2 = None
@@ -57,6 +57,7 @@ class DepthMeasurement(Node):
         mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, np.ones((8, 8), np.uint8))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((8, 8), np.uint8))
                 
+        cv2.imshow("mask", mask)
 
         # count = 0
         # begin = -1
@@ -77,7 +78,7 @@ class DepthMeasurement(Node):
         col_sums = np.count_nonzero(mask, axis=0)  # shape: (640,)
 
         # Criar máscara booleana das colunas que passam do limite (60% da altura = 288)
-        valid_cols = col_sums > 288
+        valid_cols = col_sums > 200
 
         # Encontrar sequências contínuas de colunas válidas
         from itertools import groupby
@@ -91,12 +92,12 @@ class DepthMeasurement(Node):
 
         pipe_area = np.zeros_like(mask)
 
-        if len(longest_group) > 32:
+        if len(longest_group) > 10:
             begin = longest_group[0][1]
             end = longest_group[-1][1]
             width = longest_group[-1][0] + 1
             pipe_area[:, begin:end] = 255
-            print(width)
+            #print(f'width: {width}')
 
 
         cv2.imshow("pipe_area", pipe_area)
@@ -116,10 +117,11 @@ class DepthMeasurement(Node):
 
         #Conta o numero de pixels detectados pelo filtro de cor dentro da area roi
         pixels_nonzero = np.count_nonzero(self.gray)
-        #print(pixels_nonzero)
+        #print(f'pixels_nonzero: {pixels_nonzero}')
 
         #Regra de 3 para calcular a distancia baseado na variação do número de pixels
         distance = self.const / pixels_nonzero if pixels_nonzero != 0 else 0.0
+        #print(f'distance: {distance}')
 
         msg = Float32()
         msg.data = float(distance)
@@ -163,15 +165,18 @@ def main():
     rclpy.init()
     lower_red1 = np.array([0, 175, 117])
     upper_red1 = np.array([20, 255, 203])
-    lower_red2 = np.array([169, 128, 140])
-    upper_red2 = np.array([179, 255, 223])
+    lower_red2 = np.array([135, 137, 59])
+    upper_red2 = np.array([179, 255, 255])
 
-    lower_black = np.array([99, 10, 0])
-    upper_black = np.array([109, 115, 130])
+    lower_blue = np.array([80, 140, 86])
+    upper_blue = np.array([123, 255, 202])
+
+    lower_black = np.array([79, 67, 0])
+    upper_black = np.array([137, 181, 62])
     dp = DepthMeasurement(2)
     #dp.set_ranges(lower_red1, upper_red1, lower_red2, upper_red2)
     dp.set_ranges(lower_black, upper_black)
-
+    #dp.set_ranges(lower_blue, upper_blue)
     while True:
         dp.depth_callback()
 

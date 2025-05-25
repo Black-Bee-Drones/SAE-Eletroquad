@@ -20,30 +20,37 @@ BLACK = 4
 
 class DepthStateMachine(DepthMeasurement):
     def __init__(self):
-        super().__init__(0)
+        super().__init__(2)
 
 
         self.state = START
-        self.next_state = RED
+        self.next_state = BLACK
 
         self.depth_st_sub = self.create_subscription(Int8, "switch_state", self.switch_state_callback, 10)
 
+        self.changed_color_pub = self.create_publisher(Int8, "color_changed", 10)
 
         self.lower_pink = np.array([115, 62, 85]) 
         self.upper_pink = np.array([179, 255, 255])
         self.lower_range2 = None
         self.upper_range2 = None
 
-        self.lower_blue = np.array([75, 136, 90])
-        self.upper_blue = np.array([129, 255, 199])
+        self.lower_blue = np.array([75, 140, 36])
+        self.upper_blue = np.array([129, 255, 202])
 
-        self.lower_black = np.array([73, 0, 11])
-        self.upper_black = np.array([103, 46, 122])
+        # [74, 0, 0]
+        # [113, 57, 67]
+        # [105, 22, 0]
+        # [121, 70, 117]
+        # [99, 10, 0]
+        # [109, 115, 130]
+        self.lower_black = np.array([102, 124, 0])
+        self.upper_black = np.array([165, 206, 104])
 
         self.lower_red1 = np.array([0, 175, 117])
         self.upper_red1 = np.array([20, 255, 203])
-        self.lower_red2 = np.array([169, 128, 140])
-        self.upper_red2 = np.array([179, 255, 223])
+        self.lower_red2 = np.array([157, 57, 51])
+        self.upper_red2 = np.array([179, 255, 200])
 
         self.cont = 0
         
@@ -83,6 +90,10 @@ class DepthStateMachine(DepthMeasurement):
         else:
             self.state = START
             self.next_state = PINK
+
+        msg = Int8()
+        msg.data = 1
+        self.changed_color_pub.publish(msg)
 
     def teste(self):
         #so pra testar se a mudança de estados tava funcionando
