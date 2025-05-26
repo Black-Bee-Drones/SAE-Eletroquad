@@ -12,7 +12,7 @@ from std_msgs.msg import Bool
 from time import sleep
 import time
 
-from hook.states.constants import (
+from hook.constants import (
     FORWARD_SPEED_SEARCH_BLUE_LINE,
     MIN_BLUE_LINE_DETECTIONS,
     LINE_DETECT_NODE_NAME,

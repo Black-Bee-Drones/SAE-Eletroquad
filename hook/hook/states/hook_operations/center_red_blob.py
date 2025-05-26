@@ -12,7 +12,7 @@ from std_msgs.msg import Float64
 from time import sleep
 import time
 
-from hook.states.constants import (
+from hook.constants import (
     CENTERING_CONFIRMATIONS,
     LINE_DETECT_NODE_NAME,
     CENTERING_PID_PROCESS,

@@ -1,12 +1,10 @@
-import rclpy
-
 import yasmin
 from yasmin import State, Blackboard
 from yasmin_ros.basic_outcomes import SUCCEED, ABORT
 
 import time
 
-from hook.states.constants import HOCK_SERVO_CHANNEL, HOCK_RELEASE_PWM, HOCK_HOLD_PWM
+from hook.constants import HOCK_SERVO_CHANNEL, HOCK_RELEASE_PWM, HOCK_HOLD_PWM
 
 
 class ReleaseHook(State):

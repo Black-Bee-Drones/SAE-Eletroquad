@@ -11,7 +11,7 @@ from mirela_sdk.utils.process import ProcessUtils
 
 import time
 
-from hook.states.constants import (
+from hook.constants import (
     TAKEOFF_ALTITUDE,
     RETURN_ALTITUDE,
     LINE_DETECT_NODE_NAME,

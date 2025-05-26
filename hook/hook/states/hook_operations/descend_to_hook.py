@@ -1,19 +1,13 @@
 import rclpy
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 import yasmin
-from yasmin import State, StateMachine, Blackboard
+from yasmin import State, Blackboard
 from yasmin_ros.basic_outcomes import SUCCEED, ABORT
-from yasmin_ros.yasmin_node import YasminNode
-
-from mirela_sdk.utils.process import ProcessUtils
-from mirela_interfaces.msg import LineInfo
-from std_msgs.msg import Bool
 
 from time import sleep
 import time
 
-from hook.states.constants import DESCEND_SPEED, MIN_DESCEND_ALTITUDE, DESCEND_TIMEOUT
+from hook.constants import DESCEND_SPEED, MIN_DESCEND_ALTITUDE, DESCEND_TIMEOUT
 
 
 class PerformDescent(State):
