@@ -20,11 +20,11 @@ BLACK = 4
 
 class DepthStateMachine(DepthMeasurement):
     def __init__(self):
-        super().__init__(2)
+        super().__init__(0)
 
 
         self.state = START
-        self.next_state = BLACK
+        self.next_state = RED
 
         self.depth_st_sub = self.create_subscription(Int8, "switch_state", self.switch_state_callback, 10)
 
@@ -35,22 +35,16 @@ class DepthStateMachine(DepthMeasurement):
         self.lower_range2 = None
         self.upper_range2 = None
 
-        self.lower_blue = np.array([75, 140, 36])
-        self.upper_blue = np.array([129, 255, 202])
+        self.lower_blue = np.array([98, 234, 49])
+        self.upper_blue = np.array([115, 255, 255])
 
-        # [74, 0, 0]
-        # [113, 57, 67]
-        # [105, 22, 0]
-        # [121, 70, 117]
-        # [99, 10, 0]
-        # [109, 115, 130]
         self.lower_black = np.array([102, 124, 0])
         self.upper_black = np.array([165, 206, 104])
 
         self.lower_red1 = np.array([0, 175, 117])
         self.upper_red1 = np.array([20, 255, 203])
-        self.lower_red2 = np.array([157, 57, 51])
-        self.upper_red2 = np.array([179, 255, 200])
+        self.lower_red2 = np.array([157, 176, 0])
+        self.upper_red2 = np.array([179, 255, 143])
 
         self.cont = 0
         

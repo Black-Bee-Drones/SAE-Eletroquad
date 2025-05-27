@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 from std_msgs.msg import Float32
 from std_msgs.msg import Int8
+from itertools import groupby
+
 
 #Movimentação do drone conforme as cores
 #Altura max do drone é de 2.5 metros
@@ -43,7 +45,6 @@ class DepthMeasurement(Node):
         
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         mask = cv2.inRange(hsv, self.lower_range, self.upper_range)
         if self.lower_range2 is not None and self.upper_range2 is not None:
@@ -57,7 +58,7 @@ class DepthMeasurement(Node):
         mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, np.ones((8, 8), np.uint8))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((8, 8), np.uint8))
                 
-        cv2.imshow("mask", mask)
+        #cv2.imshow("mask", mask)
 
         # count = 0
         # begin = -1
@@ -80,9 +81,6 @@ class DepthMeasurement(Node):
         # Criar máscara booleana das colunas que passam do limite (60% da altura = 288)
         valid_cols = col_sums > 200
 
-        # Encontrar sequências contínuas de colunas válidas
-        from itertools import groupby
-        from operator import itemgetter
 
         indices = np.where(valid_cols)[0]
         groups = [list(g) for k, g in groupby(enumerate(indices), lambda x: x[0] - x[1])]
@@ -100,7 +98,7 @@ class DepthMeasurement(Node):
             #print(f'width: {width}')
 
 
-        cv2.imshow("pipe_area", pipe_area)
+        #cv2.imshow("pipe_area", pipe_area)
 
         #Matriz do tamanho da mascara preenchida com zeros
         roi = np.zeros_like(mask)
@@ -109,18 +107,18 @@ class DepthMeasurement(Node):
         roi[240:241,:] = 255
 
         #result = cv2.bitwise_and(frame, roi, mask=mask)
-        self.gray = cv2.bitwise_and(pipe_area, roi)
-        cv2.imshow("result", self.gray)
+        self.pipe_in_roi = cv2.bitwise_and(pipe_area, roi)
+        #cv2.imshow("result", self.pipe_in_roi)
 
         #Conversão para grayscale para que a imagem possua apenas 1 canal
-        #self.gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+        #self.pipe_in_roi = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
         #Conta o numero de pixels detectados pelo filtro de cor dentro da area roi
-        pixels_nonzero = np.count_nonzero(self.gray)
+        #pixels_nonzero = np.count_nonzero(self.pipe_in_roi)
         #print(f'pixels_nonzero: {pixels_nonzero}')
 
         #Regra de 3 para calcular a distancia baseado na variação do número de pixels
-        distance = self.const / pixels_nonzero if pixels_nonzero != 0 else 0.0
+        distance = self.const / width if width != 0 else 0.0
         #print(f'distance: {distance}')
 
         msg = Float32()
@@ -130,7 +128,7 @@ class DepthMeasurement(Node):
         #print(f'{distance:.2f}')
         #print(pixels_nonzero)
 
-        cv2.imshow("preview", frame)
+        #cv2.imshow("preview", frame)
         #cv2.imshow("result", result)
 
         if cv2.waitKey(1) == ord('q'):
@@ -142,8 +140,8 @@ class DepthMeasurement(Node):
         #self.get_logger().info("find obj")
 
         """Identifies whether the object is located at the right side or the left side of the image or at its center"""
-        left = np.count_nonzero(self.gray[:, 0:320]) #[:, 0:960]
-        right= np.count_nonzero(self.gray[:, 320:640]) #[:, 320:640][:, 960:1920]
+        left = np.count_nonzero(self.pipe_in_roi[:, 0:320]) #[:, 0:960]
+        right= np.count_nonzero(self.pipe_in_roi[:, 320:640]) #[:, 320:640][:, 960:1920]
 
         msg = Int8()
 
