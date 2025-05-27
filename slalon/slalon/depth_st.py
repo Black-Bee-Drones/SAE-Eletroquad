@@ -35,16 +35,16 @@ class DepthStateMachine(DepthMeasurement):
         self.lower_range2 = None
         self.upper_range2 = None
 
-        self.lower_blue = np.array([98, 234, 49])
-        self.upper_blue = np.array([115, 255, 255])
+        self.lower_blue = np.array([86, 162, 118])
+        self.upper_blue = np.array([127, 255, 255])
 
-        self.lower_black = np.array([102, 124, 0])
-        self.upper_black = np.array([165, 206, 104])
+        self.lower_black = np.array([100, 92, 0])
+        self.upper_black = np.array([138, 166, 161])
 
         self.lower_red1 = np.array([0, 175, 117])
         self.upper_red1 = np.array([20, 255, 203])
-        self.lower_red2 = np.array([157, 176, 0])
-        self.upper_red2 = np.array([179, 255, 143])
+        self.lower_red2 = np.array([151, 137, 100])
+        self.upper_red2 = np.array([179, 252, 255])
 
         self.cont = 0
         

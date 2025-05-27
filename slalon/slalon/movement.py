@@ -52,7 +52,7 @@ class MovementStateMachine(Node):
             found = False
             start = time.time()
             now = time.time()
-            while (now - start) < 3:
+            while now - start < 3:
                 self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.5, False)
                 rclpy.spin_once(self)
                 
@@ -63,9 +63,9 @@ class MovementStateMachine(Node):
                     return self.object_location
                 now = time.time()
 
-            if not found:
-                
+            if found == False:
                 self.get_logger().warning("NOT FOUND")
+                self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, -0.5, time=3.0)
                 start = time.time()
                 now = time.time()
                 while now - start < 3:
@@ -76,6 +76,9 @@ class MovementStateMachine(Node):
                         self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, 0.5, time=now - start)
                         return self.object_location
                     now = time.time()
+                if found == False:
+                    self.get_logger().info(f"vorta {found}")
+                    self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, 0.5, time=3.0)
 
         return self.object_location
 
@@ -102,25 +105,25 @@ class MovementStateMachine(Node):
 
     def move_foward(self):
         self.get_logger().info("Drone going foward")
-        """while self.distance_to_object > 200:
+        while self.distance_to_object > 300:
             
             self.drone.offboard_velocity(1.0, 0.0, 0.0, 0.0)
             rclpy.spin_once(self)
 
-        self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.0, False)"""
+        self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.0, False)
 
     def pass_by(self):
         if self.side == LEFT:
             self.get_logger().info("Moving drone to the left for 5 seconds")
-            self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=2.5)
+            self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=2.0)
             self.side = RIGHT
         else:
             self.get_logger().info("Moving drone to the right for 5 seconds")
-            self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=2.5)
+            self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=2.0)
             self.side = LEFT
 
         self.get_logger().info("Moving foward for 5 seconds")
-        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=2.5)
+        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=3.5)
 
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
@@ -152,7 +155,6 @@ class MovementStateMachine(Node):
         elif self.state == 5:
             self.get_logger().info("Landing drone...")
             self.drone.land()
-
     def change_state(self):
         if self.state == 0:
             self.state = 1

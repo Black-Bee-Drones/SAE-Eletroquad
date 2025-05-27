@@ -23,6 +23,7 @@ setup(
         'console_scripts': [
             'depth_st = slalon.depth_st:main',
             'movement = slalon.movement:main',
+            'test_detection = slalon.test_detection:main'
         ],
         'launch': [
         'slalon_launch = slalon.launch.slalon_launch:generate_launch_description',
