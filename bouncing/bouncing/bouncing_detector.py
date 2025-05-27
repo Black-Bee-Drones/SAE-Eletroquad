@@ -7,19 +7,16 @@ import numpy as np
 
 
 class BouncingDetector(Node):
-    def __init__(self, image_source: str = "webcam"):
+    def __init__(self, image_source: str = "c920"):
         super().__init__("bouncing_detector_node")
-        self.image_handler: ImageHandler = ImageHandler(node=self, image_source=image_source, show_result='') 
-        self.state_sub = self.create_subscription(String, "/current_state", self.state_callback, 10)
+        self.image_handler: ImageHandler = ImageHandler(node=self, image_source=image_source, show_result='', c920_config=2) 
+        self.figure_sub = self.create_subscription(String, "/current_figure", self.figure_callback, 10)
         self.error_pub = self.create_publisher(Float32MultiArray, "/figure_error", 10)
+        self.status_pub = self.create_publisher(String, "/detector_status", 10)
         self.image_handler.run()
-        
+        self.image_handler.image_processing_callback = None
 
-    def state_callback(self, msg: String) -> None:
-        state: str = msg.data
-        self.get_logger().info(f"New state: {state}")
-
-        callback_map: dict[str, callable] = {
+        self.callback_map: dict[str, callable] = {
             "circle": self.findCircle,
             "square": self.findSquare,
             "triangle": self.findTriangle,
@@ -28,10 +25,21 @@ class BouncingDetector(Node):
             "star": self.findStar,
             "cross": self.findCross,
             "house": self.findHouse,
-            "none": lambda img: None,
+            "none": None,
         }
 
-        self.image_handler.image_processing_callback = callback_map.get(state, None)
+        self.publish_ready()
+
+    def figure_callback(self, msg: String) -> None:
+        figure: str = msg.data
+        self.get_logger().info(f"New figure: {figure}")
+        func = self.callback_map.get(figure, None)
+        self.image_handler.image_processing_callback = func
+
+    def publish_ready(self):
+        msg = String()
+        msg.data = "ready"
+        self.status_pub.publish(msg)
 
     def publish_error(self, dx: float, dy: float) -> None:
         msg: Float32MultiArray = Float32MultiArray()
