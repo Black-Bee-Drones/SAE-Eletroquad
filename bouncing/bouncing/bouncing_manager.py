@@ -3,8 +3,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from typing import List
 
-TAKE_OFF_DELAY: float = 5.0 # This is the time in seconds to wait after takeoff before publishing the first state
-WAIT_INIT_DELAY: float = 2.0 # This is the time in seconds to wait for the other nodes to start before takeoff
+TAKE_OFF_DELAY: float = 5.0 # This is the time in seconds to wait after takeoff before publishing the next figure
 
 class BouncingManager(Node):
     def __init__(self) -> None:
@@ -13,25 +12,33 @@ class BouncingManager(Node):
         self.figures: List[str] = ["circle", "square", "cross"]
         self.current_index: int = 0
 
-        self.state_pub = self.create_publisher(String, "/current_state", 10)
+        self.figure_pub = self.create_publisher(String, "/current_figure", 10)
         self.cmd_pub = self.create_publisher(String, "/mission_cmd", 10)
 
         self.create_subscription(String, "/movement_status", self.movement_cb, 10)
+        self.create_subscription(String, "/detector_status", self.detector_cb, 10)
 
         self.takeoff_timer = None
-        self.state_timer = None
+        self.figure_timer = None
+
+        self.detector_ready: bool = False
+        self.movement_ready: bool = False
+
+        while rclpy.ok():
+            rclpy.spin_once(self)
+            if self.detector_ready and self.movement_ready:
+                break
 
         self.get_logger().info("[Manager] Starting Bouncing Mission...")
-        self.publish_stop_state()
+        self.publish_stop_detection()
 
-        # Schedule takeoff shortly after starting
-        self.takeoff_timer = self.create_timer(WAIT_INIT_DELAY, self.send_takeoff)
+        self.send_takeoff()
 
-    def publish_stop_state(self) -> None:
+    def publish_stop_detection(self) -> None:
         msg = String()
         msg.data = "none"
-        self.state_pub.publish(msg)
-        self.get_logger().info("[Manager] Sending No-State to Detector.")
+        self.figure_pub.publish(msg)
+        self.get_logger().info("[Manager] Sending No-figure to Detector.")
 
     def send_takeoff(self) -> None:
         if self.takeoff_timer:
@@ -42,40 +49,52 @@ class BouncingManager(Node):
         self.cmd_pub.publish(msg)
         self.get_logger().info("[Manager] Publishing Take-off command...")
 
-        # Schedule publishing of the current state
-        self.state_timer = self.create_timer(TAKE_OFF_DELAY, self.publish_current_state)
+        # Schedule publishing of the current figure
+        self.figure_timer = self.create_timer(TAKE_OFF_DELAY, self.publish_current_figure)
 
-    def publish_current_state(self) -> None:
-        if self.state_timer:
-            self.state_timer.cancel()
+    def publish_current_figure(self) -> None:
+        if self.figure_timer:
+            self.figure_timer.cancel()
 
         if self.current_index < len(self.figures):
-            state = self.figures[self.current_index]
+            figure = self.figures[self.current_index]
             msg = String()
-            msg.data = state
-            self.state_pub.publish(msg)
-            self.get_logger().info(f"[Manager] Changing to state: {state}")
+            msg.data = figure
+            self.figure_pub.publish(msg)
+            self.get_logger().info(f"[Manager] Changing to figure: {figure}")
+            self.detector_ready = False
         else:
-            self.get_logger().info("[Manager] All states completed.")
+            self.get_logger().info("[Manager] All figures completed.")
 
     def movement_cb(self, msg: String) -> None:
         status = msg.data
 
+        if status == "ready":
+            self.movement_ready = True
+
         if status == "landed":
-            self.get_logger().info(f"[Manager] State '{self.figures[self.current_index]}' finished.")
+            self.get_logger().info(f"[Manager] figure '{self.figures[self.current_index]}' finished.")
 
             self.current_index += 1
             if self.current_index >= len(self.figures):
-                self.get_logger().info("[Manager] No more states to execute.")
+                self.get_logger().info("[Manager] No more figures to execute.")
+                rclpy.shutdown()
                 return
-
-            self.get_logger().info("[Manager] Publishing Take-off before next state...")
+            
+            self.publish_stop_detection()
+            self.get_logger().info("[Manager] Publishing Take-off before next figure...")
             msg = String()
             msg.data = "takeoff"
             self.cmd_pub.publish(msg)
 
-            # Schedule next state after takeoff delay
-            self.state_timer = self.create_timer(TAKE_OFF_DELAY, self.publish_current_state)
+            # Schedule next figure after takeoff delay
+            self.figure_timer = self.create_timer(TAKE_OFF_DELAY, self.publish_current_figure)
+
+    def detector_cb(self, msg: String):
+        status = msg.data
+
+        if status == "ready":
+            self.detector_ready = True
 
 
 def main(args=None) -> None:
