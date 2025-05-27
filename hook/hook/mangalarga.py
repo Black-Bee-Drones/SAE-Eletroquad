@@ -53,7 +53,7 @@ class HangTheHookSM(StateMachine):
         self.add_state(
             "CENTER_RED_BLOB",
             CenterRedBlob(),
-            transitions={SUCCEED: "DESCEND_TO_HOOK", ABORT: "RETURN_TO_LAUNCH"},
+            transitions={SUCCEED: "RETURN_TO_LAUNCH", ABORT: "RETURN_TO_LAUNCH"},
         )
 
         self.add_state(

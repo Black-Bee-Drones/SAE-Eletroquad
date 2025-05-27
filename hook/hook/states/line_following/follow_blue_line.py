@@ -213,7 +213,7 @@ class StartPIDControllers(State):
             f"-p state_topic:={blue_center_state_topic} "
             f"-p setpoint_topic:={blue_center_setpoint_topic} "
             f"-p control_effort_topic:={self.vel_y_topic} "
-            "-p publish_rate:=5.0 "
+            "-p publish_rate:=10.0 "
             "-p auto_start:=true "
             f"-r __node:={LINE_DETECTION_BLUE_COLOR_NAME}_center_pid"
         )
@@ -229,7 +229,7 @@ class StartPIDControllers(State):
             f"-p state_topic:={blue_angle_state_topic} "
             f"-p setpoint_topic:={blue_angle_setpoint_topic} "
             f"-p control_effort_topic:={self.angular_z_topic} "
-            "-p publish_rate:=5.0 "
+            "-p publish_rate:=10.0 "
             "-p auto_start:=true "
             f"-r __node:={LINE_DETECTION_BLUE_COLOR_NAME}_angle_pid"
         )
@@ -241,7 +241,6 @@ class StartPIDControllers(State):
         if not ProcessUtils.start_process(angle_pid_cmd, ANGLE_PID_PROCESS):
             yasmin.YASMIN_LOG_ERROR("Failed to start angle PID controller.")
             # Kill the center PID process that was started
-            ProcessUtils.kill_process(CENTER_PID_PROCESS)
             return ABORT
 
         yasmin.YASMIN_LOG_INFO("PID controllers started successfully.")
@@ -270,6 +269,8 @@ class FollowLineWithDetection(State):
         self.current_red_center_x = None
         self.current_y_velocity = 0.0
         self.current_angular_z = 0.0
+        self.update_center=False
+        self.update_angle=False
         self.node = YasminNode.get_instance()
 
     def red_detect_callback(self, msg: Bool):
@@ -277,6 +278,10 @@ class FollowLineWithDetection(State):
             self.red_count_confirmations += 1
         else:
             self.red_count_confirmations = 0  # Reset count if detection lost
+
+        yasmin.YASMIN_LOG_INFO(
+            f"Red hose count: {self.red_count_confirmations} detections"
+        )
 
         # Check if we've detected the red line consistently
         if self.red_count_confirmations >= MIN_RED_COUNT_CONFIRMATIONS:
@@ -287,9 +292,11 @@ class FollowLineWithDetection(State):
 
     def control_effort_y_callback(self, msg: Float64):
         self.current_y_velocity = msg.data
+        self.update_center=True
 
     def control_effort_angular_z_callback(self, msg: Float64):
         self.current_angular_z = msg.data
+        self.update_angle=True
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
@@ -329,26 +336,44 @@ class FollowLineWithDetection(State):
         )
 
         start_time = time.time()
-        timeout = 600  # seconds
+        timeout = 120  # seconds
 
         # Main control loop
         while time.time() - start_time < timeout and not self.red_detected:
-            # Use the PID controller outputs for velocity command
-            self.mavdrone.offboard_velocity(
-                linear_x=FORWARD_SPEED_FOLLOW_BLUE_LINE,
-                linear_y=self.current_y_velocity,
-                linear_z=0.0,
-                angular_z=self.current_angular_z,
-            )
+            if self.update_center or self.update_angle:
+                # Use the PID controller outputs for velocity command
+                self.mavdrone.offboard_velocity(
+                    linear_x=FORWARD_SPEED_FOLLOW_BLUE_LINE,
+                    linear_y=self.current_y_velocity,
+                    linear_z=0.0,
+                    angular_z=self.current_angular_z,
+                )
+            
+            self.update_center=False
+            self.update_angle=False
 
-            rclpy.spin_once(self.node, timeout_sec=0.05)
+
+            rclpy.spin_once(self.node)
 
             if self.red_detected:
                 yasmin.YASMIN_LOG_INFO("Red hose detected!")
+                self.mavdrone.offboard_velocity(
+                    linear_x=0.0,
+                    linear_y=0.0,
+                    linear_z=0.0,
+                    angular_z=0.0,
+                )
                 self._cleanup_subscribers()
                 return "red_detected"
 
         self._cleanup_subscribers()
+
+        self.mavdrone.offboard_velocity(
+                    linear_x=0.0,
+                    linear_y=0.0,
+                    linear_z=0.0,
+                    angular_z=0.0,
+                )
 
         if self.red_detected:
             return "red_detected"

@@ -36,9 +36,9 @@ class Initialize(State):
 
             time.sleep(3)
 
-            if not self.mavdrone.get_state.connected:
-                yasmin.YASMIN_LOG_ERROR("MAVROS not connected!")
-                return ABORT
+            # if not self.mavdrone.get_state.connected:
+            #     yasmin.YASMIN_LOG_ERROR("MAVROS not connected!")
+            #     return ABORT
 
             yasmin.YASMIN_LOG_INFO("Drone Initialized Successfully.")
 
