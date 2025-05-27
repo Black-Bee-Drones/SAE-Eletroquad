@@ -3,7 +3,7 @@ import time
 from rclpy.node import Node
 from std_msgs.msg import String, Float32MultiArray
 from rclpy.qos import qos_profile_sensor_data
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from mirela_sdk.control.mavros.mavros_api import MavDrone
 
 
@@ -51,30 +51,34 @@ class MovementNode(Node):
 
         self.drone: MavDrone = MavDrone(self, False)
 
-        # Define corners of the mapped area
         self.corner_top_left: Tuple[float, float] = (p1_lat, p1_lon)     
         self.corner_top_right: Tuple[float, float] = (p2_lat, p2_lon)    
         self.corner_bottom_left: Tuple[float, float] = (p3_lat, p3_lon)  
         self.corner_bottom_right: Tuple[float, float] = (p4_lat, p4_lon) 
 
-        # Search waypoints (interpolated between corners)
         self.search_point_left: Tuple[float, float]
         self.search_point_middle: Tuple[float, float]
         self.search_point_right: Tuple[float, float]
 
         self.points_calculation()
 
+        self.points_to_visit: List[float] = [self.search_point_left, self.search_point_middle, self.search_point_right]
+
         self.error_threshold: float = 5.0  # pixels
         self.last_time: float = 0.0
         self.landed: bool = False
 
-        self.pid_x = PID(kp=0.1, ki=0.0, kd=0.01)
-        self.pid_y = PID(kp=0.1, ki=0.0, kd=0.01)
+        self.pid_x = PID(kp=0.1, ki=0.0, kd=0.00)
+        self.pid_y = PID(kp=0.1, ki=0.0, kd=0.00)
 
         self.status_pub = self.create_publisher(String, "/movement_status", 10)
 
         self.create_subscription(Float32MultiArray, "/figure_error", self.error_cb, qos_profile_sensor_data)
         self.create_subscription(String, "/mission_cmd", self.cmd_cb, 10)
+
+        msg = String()
+        msg.data = "ready"
+        self.status_pub.publish(msg)
 
     def cmd_cb(self, msg: String) -> None:
         """
@@ -86,7 +90,7 @@ class MovementNode(Node):
         command: str = msg.data
         if command == "takeoff":
             self.get_logger().info("[Movement] Taking off...")
-            self.drone.arm_takeoff(1.0)
+            # self.drone.arm_takeoff(1.0)
             time.sleep(5)
             self.landed = False
         else:
@@ -100,7 +104,7 @@ class MovementNode(Node):
             msg (Float32MultiArray): Error in pixels received from the vision system.
         """
         if self.landed:
-            self.get_logger().debug("[MovementNode] Drone already landed. Ignoring visual error.")
+            self.get_logger().warning("[MovementNode] Drone already landed. Ignoring visual error.")
             return
         
         dx: float = msg.data[0]
@@ -114,7 +118,7 @@ class MovementNode(Node):
         output_y: float = self.pid_y.compute(dy, dt)
 
         # TODO: Implement movement logic here using output_x and output_y
-        self.get_logger().debug(
+        self.get_logger().info(
             f"[PID] Input dx={dx:.2f}, dy={dy:.2f} | Output vx={output_x:.2f}, vy={output_y:.2f} | dt={dt:.3f}"
         )
 
@@ -124,7 +128,7 @@ class MovementNode(Node):
             self.pid_x.restart()
             self.pid_y.restart()
 
-            self.drone.land()
+            # self.drone.land()
             time.sleep(5)
             self.get_logger().info("[Movement] Landed.")
 
@@ -139,12 +143,12 @@ class MovementNode(Node):
         Computes intermediate search points across the mapped region using geodesic interpolation.
         The points are evenly spaced along the center axis of the area, and divide the area in 3 sections, which will map the entire area.
         """
-        midpoint_top = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_top_right, 0.5)
-        midpoint_bottom = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 0.5)
+        midpoint_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 0.5)
+        midpoint_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 0.5)
 
-        self.search_point_left = self.interp_geo(midpoint_top, midpoint_bottom, 1/6)
-        self.search_point_middle = self.interp_geo(midpoint_top, midpoint_bottom, 3/6)
-        self.search_point_right = self.interp_geo(midpoint_top, midpoint_bottom, 5/6)
+        self.search_point_left = self.drone.gps_controller.interp_geo(midpoint_left, midpoint_right, 1/6)
+        self.search_point_middle = self.drone.gps_controller.interp_geo(midpoint_left, midpoint_right, 3/6)
+        self.search_point_right = self.drone.gps_controller.interp_geo(midpoint_left, midpoint_right, 5/6)
 
 
 def main(args=None) -> None:
