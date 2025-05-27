@@ -3,7 +3,7 @@ import cv2
 from rclpy.node import Node
 import numpy as np
 from itertools import groupby
-
+from mirela_sdk.image_processing.color import ColorDetector
 
 #Movimentação do drone conforme as cores
 #Altura max do drone é de 2.5 metros
@@ -13,10 +13,10 @@ from itertools import groupby
 
 #filtro preto ta uma bosta
 
-blue = np.array([[86, 162, 118], [127, 255, 255]]) 
-black = np.array([[100, 92, 0], [138, 166, 161]])
+blue = np.array([[112, 66, 0], [120, 125, 70]]) 
+black = np.array([[62, 26, 0], [138, 166, 161]])
 red1 = np.array([[0, 175, 117], [20, 255, 203]])
-red2 = np.array([[151, 137, 100], [179, 252, 255]])
+red2 = np.array([[149, 93, 12], [179, 207, 99]])
 
 class TestDetection(Node):
     def __init__(self, cap=0):
@@ -42,6 +42,7 @@ class TestDetection(Node):
 
         
     def detect(self):
+
         ret, frame = self.cap.read()
         
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
