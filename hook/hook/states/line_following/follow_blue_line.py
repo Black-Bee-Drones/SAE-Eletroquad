@@ -19,6 +19,7 @@ from hook.constants import (
     CENTER_PID_PROCESS,
     ANGLE_PID_PROCESS,
     IMAGE_CENTER_X,
+    IMAGE_CENTER_Y,
     ANGLE_SETPOINT,
     CENTER_P,
     CENTER_I,
@@ -273,11 +274,8 @@ class FollowLineWithDetection(State):
         self.update_angle=False
         self.node = YasminNode.get_instance()
 
-    def red_detect_callback(self, msg: Bool):
-        if msg.data:
-            self.red_count_confirmations += 1
-        else:
-            self.red_count_confirmations = 0  # Reset count if detection lost
+    def red_detect_callback(self, msg: LineInfo):
+        self.red_count_confirmations += 1
 
         yasmin.YASMIN_LOG_INFO(
             f"Red hose count: {self.red_count_confirmations} detections"
@@ -321,7 +319,7 @@ class FollowLineWithDetection(State):
 
         self.red_detected_sub = self.node.create_subscription(
             Bool,
-            f"/line_detect/{LINE_DETECTION_RED_COLOR_NAME}",
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_detect_callback,
             10,
         )

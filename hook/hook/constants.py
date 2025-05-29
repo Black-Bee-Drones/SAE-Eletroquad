@@ -20,7 +20,7 @@ FORWARD_SPEED_SEARCH_BLUE_LINE = 0.18
 
 MIN_BLUE_LINE_DETECTIONS = 20  # Consecutive detections to confirm line
 
-MIN_DESCEND_ALTITUDE = 2.15  # Failsafe altitude during descent
+MIN_DESCEND_ALTITUDE = 2.12  # Failsafe altitude during descent
 
 RETURN_ALTITUDE = 2  # Altitude for RTL
 
@@ -54,12 +54,12 @@ CENTERING_D = 0.0001
 CENTERING_OUTPUT_MIN = -0.3
 CENTERING_OUTPUT_MAX = 0.3
 
-MIN_RED_COUNT_CONFIRMATIONS = 6  # Consecutive frames above threshold
+MIN_RED_COUNT_CONFIRMATIONS = 15  # Consecutive frames above threshold
 CENTERING_CONFIRMATIONS = 5  # Consecutive low effort confirmations
 
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 30  # Timeout for descent in seconds
 
-HOCK_SERVO_CHANNEL = 9  # Example channel
-HOCK_RELEASE_PWM = 1900  # Example PWM
-HOCK_HOLD_PWM = 1100  # Example PWM
+HOCK_SERVO_CHANNEL = 3 
+HOCK_RELEASE_PWM = 1000.0
+HOCK_HOLD_PWM = 1500.0

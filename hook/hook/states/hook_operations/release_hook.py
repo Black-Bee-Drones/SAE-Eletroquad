@@ -16,16 +16,15 @@ class ReleaseHook(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Releasing hook...")
         mavdrone = blackboard["mavdrone"]
-
         try:
             mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
             time.sleep(1)
 
-            mavdrone.do_servo(HOCK_SERVO_CHANNEL, HOCK_RELEASE_PWM)
-            time.sleep(2)
-
             mavdrone.do_servo(HOCK_SERVO_CHANNEL, HOCK_HOLD_PWM)
             time.sleep(1)
+
+            mavdrone.do_servo(HOCK_SERVO_CHANNEL, HOCK_RELEASE_PWM)
+            time.sleep(2)
 
             return SUCCEED
 

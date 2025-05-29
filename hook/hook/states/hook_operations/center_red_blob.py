@@ -17,6 +17,7 @@ from hook.constants import (
     LINE_DETECT_NODE_NAME,
     CENTERING_PID_PROCESS,
     IMAGE_CENTER_X,
+    IMAGE_CENTER_Y,
     CENTERING_P,
     CENTERING_I,
     CENTERING_D,
@@ -79,17 +80,17 @@ class SetupRedLineStateRepublisher(State):
         self.should_continue = True
 
         self.red_center_state_topic = (
-            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_x"
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y"
         )
         self.red_center_setpoint_topic = (
             f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
         )
-        self.center_setpoint = IMAGE_CENTER_X
+        self.center_setpoint = IMAGE_CENTER_Y
 
     def line_info_callback(self, msg: LineInfo):
-        """Callback for LineInfo messages, republishes center_x and setpoint"""
+        """Callback for LineInfo messages, republishes center_y and setpoint"""
         self.center_setpoint_pub.publish(Float64(data=self.center_setpoint))
-        self.red_center_pub.publish(Float64(data=msg.center_x))
+        self.red_center_pub.publish(Float64(data=msg.center_y))
 
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO(
@@ -142,7 +143,7 @@ class StartCenteringPID(State):
 
         # Define topic names
         self.red_center_state_topic = (
-            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_x"
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y"
         )
         self.red_center_setpoint_topic = (
             f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
@@ -160,7 +161,7 @@ class StartCenteringPID(State):
 
         # Publish initial setpoint
         center_msg = Float64()
-        center_msg.data = IMAGE_CENTER_X
+        center_msg.data = IMAGE_CENTER_Y
         center_setpoint_pub.publish(center_msg)
 
         centering_pid_cmd = (
@@ -213,7 +214,7 @@ class PerformCentering(State):
         if self.current_y_velocity <= 0.05:
             self.centering_confirmations += 1
         else:
-            self.centering_confirmations = 0
+            self.centering_confirmations -= 0
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
@@ -224,7 +225,7 @@ class PerformCentering(State):
 
         red_center_state_topic = blackboard.get(
             "red_center_state_topic",
-            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_x",
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y",
         )
         red_vel_y_topic = blackboard.get(
             "red_vel_y_topic", f"/{LINE_DETECTION_RED_COLOR_NAME}/velocity_y"
@@ -246,12 +247,12 @@ class PerformCentering(State):
         while time.time() - start_time < timeout:
             if self.update_control_effort:
                 mavdrone.offboard_velocity(
-                    linear_x=-self.current_y_velocity,
+                    linear_x=self.current_y_velocity,
                     linear_y=0.0,
                     linear_z=0.0,
                     angular_z=0.0,
                 )
-                self.update_control_effort = False
+            self.update_control_effort = False
 
             rclpy.spin_once(self.node)
 
