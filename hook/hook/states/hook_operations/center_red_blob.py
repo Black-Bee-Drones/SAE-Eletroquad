@@ -204,10 +204,12 @@ class PerformCentering(State):
         self.current_red_center_x = None
         self.current_y_velocity = 0.0
         self.last_error_x = 0
+        self.update_control_effort = True
         self.node = YasminNode.get_instance()
 
     def control_effort_y_callback(self, msg: Float64):
         self.current_y_velocity = msg.data
+        self.update_control_effort = True
         if self.current_y_velocity <= 0.05:
             self.centering_confirmations += 1
         else:
@@ -242,14 +244,16 @@ class PerformCentering(State):
 
         # Main control loop
         while time.time() - start_time < timeout:
-            mavdrone.offboard_velocity(
-                linear_x=-self.current_y_velocity,
-                linear_y=0.0,
-                linear_z=0.0,
-                angular_z=0.0,
-            )
+            if self.update_control_effort:
+                mavdrone.offboard_velocity(
+                    linear_x=-self.current_y_velocity,
+                    linear_y=0.0,
+                    linear_z=0.0,
+                    angular_z=0.0,
+                )
+                self.update_control_effort = False
 
-            rclpy.spin_once(self.node, timeout_sec=0.05)
+            rclpy.spin_once(self.node)
 
             if self.centering_confirmations >= CENTERING_CONFIRMATIONS:
                 mavdrone.offboard_velocity_timer(
@@ -257,7 +261,7 @@ class PerformCentering(State):
                     linear_y=0.0,
                     linear_z=0.0,
                     angular_z=0.0,
-                    time=2.0,
+                    time=1.0,
                 )
                 yasmin.YASMIN_LOG_INFO("Red blob centered.")
                 self._cleanup_subscribers()
