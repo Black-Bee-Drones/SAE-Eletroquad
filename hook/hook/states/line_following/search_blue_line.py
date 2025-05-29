@@ -123,6 +123,7 @@ class SearchForBlueLine(State):
             rclpy.spin_once(YasminNode.get_instance(), timeout_sec=0.05)
 
             if self.detection_count >= MIN_BLUE_LINE_DETECTIONS:
+                self.mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 yasmin.YASMIN_LOG_INFO(
                     f"Blue line confirmed after {self.detection_count} detections."
                 )
