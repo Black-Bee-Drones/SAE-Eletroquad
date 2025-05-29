@@ -61,5 +61,5 @@ DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 30  # Timeout for descent in seconds
 
 HOCK_SERVO_CHANNEL = 3 
-HOCK_RELEASE_PWM = 1000.0
-HOCK_HOLD_PWM = 1500.0
+HOCK_RELEASE_PWM = 2000.0
+HOCK_HOLD_PWM = 1000.0
