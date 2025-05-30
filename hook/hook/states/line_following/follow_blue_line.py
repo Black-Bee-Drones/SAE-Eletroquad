@@ -318,7 +318,7 @@ class FollowLineWithDetection(State):
         self.current_angular_z = 0.0
 
         self.red_detected_sub = self.node.create_subscription(
-            Bool,
+            LineInfo,
             f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_detect_callback,
             10,
