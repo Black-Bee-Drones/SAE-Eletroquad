@@ -38,7 +38,7 @@ from hook.constants import (
     LINE_DETECTION_LINE_FOLLOWING_TITLE,
     LINE_DETECTION_BLUE_SPACE,
     LINE_DETECTION_RED_SPACE,
-    LINE_DETECTION_METHOD
+    LINE_DETECTION_METHOD,
 )
 
 
@@ -270,8 +270,12 @@ class FollowLineWithDetection(State):
         self.current_red_center_x = None
         self.current_y_velocity = 0.0
         self.current_angular_z = 0.0
-        self.update_center=False
-        self.update_angle=False
+        self.filtered_angular_z = 0.0
+        self.angular_z_buffer = []
+        self.buffer_size = 4
+        self.max_angular_change = 0.5
+        self.update_center = False
+        self.update_angle = False
         self.node = YasminNode.get_instance()
 
     def red_detect_callback(self, msg: LineInfo):
@@ -281,7 +285,6 @@ class FollowLineWithDetection(State):
             f"Red hose count: {self.red_count_confirmations} detections"
         )
 
-        # Check if we've detected the red line consistently
         if self.red_count_confirmations >= MIN_RED_COUNT_CONFIRMATIONS:
             self.red_detected = True
             yasmin.YASMIN_LOG_INFO(
@@ -290,11 +293,30 @@ class FollowLineWithDetection(State):
 
     def control_effort_y_callback(self, msg: Float64):
         self.current_y_velocity = msg.data
-        self.update_center=True
+        self.update_center = True
 
     def control_effort_angular_z_callback(self, msg: Float64):
-        self.current_angular_z = msg.data
-        self.update_angle=True
+        raw_angular_z = msg.data
+
+        if len(self.angular_z_buffer) == 0:
+            self.filtered_angular_z = raw_angular_z
+        else:
+            change = abs(raw_angular_z - self.filtered_angular_z)
+            if change > self.max_angular_change and len(self.angular_z_buffer) >= 2:
+                recent_avg = sum(self.angular_z_buffer[-2:]) / 2
+                if abs(raw_angular_z - recent_avg) > self.max_angular_change:
+                    self.filtered_angular_z = recent_avg
+                else:
+                    self.filtered_angular_z = raw_angular_z
+            else:
+                self.filtered_angular_z = raw_angular_z
+
+        self.angular_z_buffer.append(self.filtered_angular_z)
+        if len(self.angular_z_buffer) > self.buffer_size:
+            self.angular_z_buffer.pop(0)
+
+        self.current_angular_z = self.filtered_angular_z
+        self.update_angle = True
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
@@ -316,15 +338,16 @@ class FollowLineWithDetection(State):
         self.current_red_center_x = None
         self.current_y_velocity = 0.0
         self.current_angular_z = 0.0
+        self.filtered_angular_z = 0.0
+        self.angular_z_buffer = []
 
         self.red_detected_sub = self.node.create_subscription(
-            LineInfo,
+            Bool,
             f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_detect_callback,
             10,
         )
 
-        # Subscribe to control efforts from PID controllers
         self.control_effort_y_sub = self.node.create_subscription(
             Float64, vel_y_topic, self.control_effort_y_callback, 10
         )
@@ -334,22 +357,19 @@ class FollowLineWithDetection(State):
         )
 
         start_time = time.time()
-        timeout = 120  # seconds
+        timeout = 120
 
-        # Main control loop
         while time.time() - start_time < timeout and not self.red_detected:
             if self.update_center or self.update_angle:
-                # Use the PID controller outputs for velocity command
                 self.mavdrone.offboard_velocity(
                     linear_x=FORWARD_SPEED_FOLLOW_BLUE_LINE,
                     linear_y=self.current_y_velocity,
                     linear_z=0.0,
                     angular_z=self.current_angular_z,
                 )
-            
-            self.update_center=False
-            self.update_angle=False
 
+            self.update_center = False
+            self.update_angle = False
 
             rclpy.spin_once(self.node)
 
@@ -367,11 +387,11 @@ class FollowLineWithDetection(State):
         self._cleanup_subscribers()
 
         self.mavdrone.offboard_velocity(
-                    linear_x=0.0,
-                    linear_y=0.0,
-                    linear_z=0.0,
-                    angular_z=0.0,
-                )
+            linear_x=0.0,
+            linear_y=0.0,
+            linear_z=0.0,
+            angular_z=0.0,
+        )
 
         if self.red_detected:
             return "red_detected"
