@@ -4,6 +4,8 @@ from rclpy.node import Node
 import numpy as np
 from itertools import groupby
 from mirela_sdk.image_processing.color import ColorDetector
+from mirela_sdk.image_processing.color.color_calibration_node import ColorCalibrationNode
+import cvzone 
 
 #Movimentação do drone conforme as cores
 #Altura max do drone é de 2.5 metros
@@ -13,72 +15,47 @@ from mirela_sdk.image_processing.color import ColorDetector
 
 #filtro preto ta uma bosta
 
-blue = np.array([[112, 66, 0], [120, 125, 70]]) 
-black = np.array([[62, 26, 0], [138, 166, 161]])
-red1 = np.array([[0, 175, 117], [20, 255, 203]])
-red2 = np.array([[149, 93, 12], [179, 207, 99]])
-
 class TestDetection(Node):
-    def __init__(self, cap=0):
+    def __init__(self, cap=2):
 
         super().__init__("teste_detection")
 
+        #SETAR SATURACAO PARA 200 E TESTES
+
         self.get_logger().info("Detection initiated...")
+
+        self.declare_parameter("cap", 2)
+        cap_param = self.get_parameter("cap").value
+
+        if cap is None:
+            cap = cap_param
+
+
         self.cap = cv2.VideoCapture(cap)
         self.width = 0
         #Numero de pixels filtrado vezes a distancia da camera à esse numero de pixels
         self.const: float = 69*100 
-        self.lower_range = blue[0]
-        self.upper_range = blue[1]
-        self.lower_range2 = None
-        self.upper_range2 = None
 
+        self.red_detector = ColorDetector("preset", "red_sl")
+        self.blue_detector = ColorDetector("preset", "blue_sl")
+        self.pink_detector = ColorDetector("preset", "pink_sl")
+        self.black_detector = ColorDetector("preset", "black_sl")
 
-    def set_ranges(self, lower_range, upper_range, lower_range2=None, upper_range2=None):
-        self.lower_range = lower_range
-        self.upper_range = upper_range
-        self.lower_range2 = lower_range2
-        self.upper_range2 = upper_range2
+        self.detector = self.black_detector
 
+        self.get_logger().info(f"webcam index: {cap}")
+
+        self.create_timer(1/30, self.detect)   
         
     def detect(self):
 
         ret, frame = self.cap.read()
         
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-
-        mask = cv2.inRange(hsv, self.lower_range, self.upper_range)
-        if self.lower_range2 is not None and self.upper_range2 is not None:
-            mask2 = cv2.inRange(hsv, self.lower_range2, self.upper_range2)
-            mask = cv2.bitwise_or(mask, mask2)
-
-        mask = cv2.dilate(mask, np.ones((11, 11), np.uint8), iterations=1)
-        mask = cv2.erode(mask, np.ones((7, 7), np.uint8), iterations=1)
-
-
-        mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, np.ones((8, 8), np.uint8))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((8, 8), np.uint8))
+        self.detector.filterColor(frame)
                 
-        #cv2.imshow("mask", mask)
-
-        # count = 0
-        # begin = -1
-        # for i in range(0, 640):
-        #     if np.count_nonzero(mask[:, i]) > 288:
-        #         if count == 0:
-        #             begin = i
-        #         count += 1
-        #     else:
-        #         if count > 32:
-        #             break
-        #         count = 0
-        #         begin = -1
-        # pipe_area = np.zeros_like(mask)
-        # pipe_area[:, begin:begin+count] = 255
 
         # Calcular quantos pixels brancos existem em cada coluna
-        col_sums = np.count_nonzero(mask, axis=0)  # shape: (640,)
+        col_sums = np.count_nonzero(self.detector.mask, axis=0)  # shape: (640,)
 
         # Criar máscara booleana das colunas que passam do limite (60% da altura = 288)
         valid_cols = col_sums > 200
@@ -90,9 +67,13 @@ class TestDetection(Node):
         # Encontrar o maior grupo contínuo (maior faixa de colunas válidas)
         longest_group = max(groups, key=len, default=[])
 
-        pipe_area = np.zeros_like(mask)
+        pipe_area = np.zeros_like(self.detector.mask)
 
-        if len(longest_group) > 10:
+        #Exige teste. Pode ser um numero maior pois se o drone nn encontrar nada ele chega pra frente
+        #o numero de pixels na lagura do drone a 5 metros é 23
+        #Esse 69 tbm necessita teste
+        #Caso o maior grupo não seja o cano temos que pensar numa maneira de procurar outro ignorando este
+        if 69 > len(longest_group) > 15: 
             begin = longest_group[0][1]
             end = longest_group[-1][1]
             self.width = longest_group[-1][0] + 1
@@ -100,23 +81,22 @@ class TestDetection(Node):
             #print(f'width: {width}')
 
 
-        cv2.imshow("pipe_area", pipe_area)
 
         #Matriz do tamanho da mascara preenchida com zeros
-        roi = np.zeros_like(mask)
+        roi = np.zeros_like(self.detector.mask)
 
         #Define uma linha no centro dessa matriz com valor 255, que será a área de detecção
         roi[240:241,:] = 255
 
-        #result = cv2.bitwise_and(frame, roi, mask=mask)
+        pixels_in_roi = cv2.bitwise_and(self.detector.mask, roi)
+
         self.pipe_in_roi = cv2.bitwise_and(pipe_area, roi)
-        cv2.imshow("result", self.pipe_in_roi)
 
         #Conversão para grayscale para que a imagem possua apenas 1 canal
-        #self.pipe_in_roi = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+        #pixels_in_roi = cv2.cvtColor(pixels_in_roi, cv2.COLOR_BGR2GRAY)
 
         #Conta o numero de pixels detectados pelo filtro de cor dentro da area roi
-        #pixels_nonzero = np.count_nonzero(self.pipe_in_roi)
+        pixels_nonzero = np.count_nonzero(pixels_in_roi)
         #print(f'pixels_nonzero: {pixels_nonzero}')
 
         #Regra de 3 para calcular a distancia baseado na variação do número de pixels
@@ -126,21 +106,28 @@ class TestDetection(Node):
         #print(f'{distance:.2f}')
         #print(pixels_nonzero)
 
+        #cv2.imshow("mask", self.detector.mask)
+        stack = cvzone.stackImages([self.detector.mask, pixels_in_roi, pipe_area], 3, 0.7)
+        cv2.imshow("mask  pixels_in_roi  pipe_area", stack)
         #cv2.imshow("preview", frame)
-        #cv2.imshow("result", result)
 
-        if cv2.waitKey(1) == ord('q'):
+        key = cv2.waitKey(1)
+
+        if key == ord('q'):
             cv2.destroyAllWindows()
             self.cap.release()
         
-        if cv2.waitKey(1) == ord('p'):
-            self.set_ranges(black[0], black[1])
+        elif key == ord('p'):
+            self.detector = self.black_detector
 
-        if cv2.waitKey(1) == ord('v'):
-            self.set_ranges(red1[0], red2[1], red2[0], red2[1])
+        elif key == ord('v'):
+            self.detector = self.red_detector
         
-        if cv2.waitKey(1) == ord('a'):
-            self.set_ranges(blue[0], blue[1])
+        elif key == ord('a'):
+            self.detector = self.blue_detector
+        
+        elif key == ord('r'):
+            self.detector = self.pink_detector
 
     def find_object(self):
 
@@ -160,17 +147,23 @@ class TestDetection(Node):
             self.get_logger().info("RIGHT") #ta mais pra direita
         
 
-def main():
-    rclpy.init()
-    
-    test = TestDetection(0)
+def main(args=None):
+    import argparse
 
-    while True:
-        test.detect()
-        
-        if cv2.waitKey(1) == ord('q'):
-            cv2.destroyAllWindows()
-            break
+    rclpy.init(args=args)
+    
+    parser = argparse.ArgumentParser(description="Test Detection")
+    
+    parser.add_argument(
+        "--cap", type=int, default=None, help="Webcam index"
+    )
+
+    parsed_args, remaing_args = parser.parse_known_args(args=args)
+
+    test = TestDetection(cap=parsed_args.cap)
+
+    rclpy.spin(test)
+
     rclpy.shutdown()
 
 

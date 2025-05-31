@@ -20,9 +20,15 @@ BLUE = 3
 BLACK = 4
 
 class DepthStateMachine(DepthMeasurement):
-    def __init__(self):
-        super().__init__(3)
+    def __init__(self, cap = 0):
 
+        self.declare_parameter("cap", 0)
+        cap_param = self.get_parameter("cap").value
+
+        if cap is None:
+            cap = cap_param
+
+        super().__init__(cap)
 
         self.state = START
         self.next_state = RED
@@ -90,12 +96,21 @@ class DepthStateMachine(DepthMeasurement):
         self.get_logger().info("rodei")
         self.create_timer(1/30, self.depth_callback)
         self.create_timer(1/30, self.find_object)
-        self.create_timer(1, self.teste)
+        #self.create_timer(1, self.teste)
 
-def main():
+def main(args=None):
     rclpy.init()
 
-    st = DepthStateMachine()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Depth Measurement")
+
+    parser.add_argument(
+        "--cap", type=int, default=None, help="Camera index"
+    )
+    parsed_args, remaining_args = parser.parse_known_args(args=args)
+
+    st = DepthStateMachine(cap=parsed_args.cap)
     rclpy.spin(st)
 
 
