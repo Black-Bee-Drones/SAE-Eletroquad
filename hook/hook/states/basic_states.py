@@ -34,7 +34,7 @@ class Initialize(State):
             blackboard["mavdrone"] = MavDrone(node=YasminNode.get_instance())
             self.mavdrone: MavDrone = blackboard["mavdrone"]
 
-            time.sleep(3)
+            time.sleep(2)
 
             # if not self.mavdrone.get_state.connected:
             #     yasmin.YASMIN_LOG_ERROR("MAVROS not connected!")
