@@ -7,7 +7,7 @@ from yasmin_ros.yasmin_node import YasminNode
 
 from mirela_sdk.utils.process import ProcessUtils
 from mirela_interfaces.msg import LineInfo
-from std_msgs.msg import Bool, Float64
+from std_msgs.msg import Float64
 
 from time import sleep
 import time
@@ -273,7 +273,7 @@ class FollowLineWithDetection(State):
         self.filtered_angular_z = 0.0
         self.angular_z_buffer = []
         self.buffer_size = 4
-        self.max_angular_change = 0.5
+        self.max_angular_change = 0.3
         self.update_center = False
         self.update_angle = False
         self.node = YasminNode.get_instance()
@@ -297,26 +297,45 @@ class FollowLineWithDetection(State):
 
     def control_effort_angular_z_callback(self, msg: Float64):
         raw_angular_z = msg.data
-
-        if len(self.angular_z_buffer) == 0:
-            self.filtered_angular_z = raw_angular_z
-        else:
-            change = abs(raw_angular_z - self.filtered_angular_z)
-            if change > self.max_angular_change and len(self.angular_z_buffer) >= 2:
-                recent_avg = sum(self.angular_z_buffer[-2:]) / 2
-                if abs(raw_angular_z - recent_avg) > self.max_angular_change:
-                    self.filtered_angular_z = recent_avg
-                else:
-                    self.filtered_angular_z = raw_angular_z
-            else:
-                self.filtered_angular_z = raw_angular_z
-
-        self.angular_z_buffer.append(self.filtered_angular_z)
+        
+        # Mantendo a ideia do buffer
+        self.angular_z_buffer.append(raw_angular_z)
         if len(self.angular_z_buffer) > self.buffer_size:
             self.angular_z_buffer.pop(0)
+        
+        # Pensei em um filtro uando a mediana para retirar outliers
+        median_angular_z = sorted(self.angular_z_buffer)[len(self.angular_z_buffer) // 2]
 
+        # Como filtro de bruscar variacoes, encontrei o EMA (filtro exponencial movel)
+        self.filtered_angular_z = (
+            self.alpha_EMA * median_angular_z + (1 - self.alpha_EMA) * self.filtered_angular_z
+        )
         self.current_angular_z = self.filtered_angular_z
         self.update_angle = True
+        
+
+        # def control_effort_angular_z_callback(self, msg: Float64):
+        #     raw_angular_z = msg.data
+
+        #     if len(self.angular_z_buffer) == 0:
+        #         self.filtered_angular_z = raw_angular_z
+        #     else:
+        #         change = abs(raw_angular_z - self.filtered_angular_z)
+        #         if change > self.max_angular_change and len(self.angular_z_buffer) >= 2:
+        #             recent_avg = sum(self.angular_z_buffer[-2:]) / 2
+        #             if abs(raw_angular_z - recent_avg) > self.max_angular_change:
+        #                 self.filtered_angular_z = recent_avg
+        #             else:
+        #                 self.filtered_angular_z = raw_angular_z
+        #         else:
+        #             self.filtered_angular_z = raw_angular_z
+
+        #     self.angular_z_buffer.append(self.filtered_angular_z)
+        #     if len(self.angular_z_buffer) > self.buffer_size:
+        #         self.angular_z_buffer.pop(0)
+
+        #     self.current_angular_z = self.filtered_angular_z
+        #     self.update_angle = True
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
@@ -342,7 +361,7 @@ class FollowLineWithDetection(State):
         self.angular_z_buffer = []
 
         self.red_detected_sub = self.node.create_subscription(
-            Bool,
+            LineInfo,
             f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}",
             self.red_detect_callback,
             10,
@@ -473,7 +492,7 @@ class FollowBlueLineWithRedDetection(StateMachine):
             transitions={
                 SUCCEED: "CLEANUP_PROCESSES",
                 ABORT: "CLEANUP_PROCESSES",
-                "red_detected": "CLEANUP_PROCESSES",
+                "red_detected": SUCCEED
             },
         )
 

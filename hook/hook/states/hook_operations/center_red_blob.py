@@ -85,7 +85,7 @@ class SetupRedLineStateRepublisher(State):
         self.red_center_setpoint_topic = (
             f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
         )
-        self.center_setpoint = IMAGE_CENTER_Y
+        self.center_setpoint = IMAGE_CENTER_Y + 150
 
     def line_info_callback(self, msg: LineInfo):
         """Callback for LineInfo messages, republishes center_y and setpoint"""
@@ -211,10 +211,14 @@ class PerformCentering(State):
     def control_effort_y_callback(self, msg: Float64):
         self.current_y_velocity = msg.data
         self.update_control_effort = True
-        if self.current_y_velocity <= 0.05:
+        
+        yasmin.YASMIN_LOG_INFO(f"Vel y: {self.current_y_velocity}")
+
+        if self.current_y_velocity <= 0.2:
             self.centering_confirmations += 1
+            yasmin.YASMIN_LOG_INFO(f"Confirmation center: {self.centering_confirmations}")
         else:
-            self.centering_confirmations -= 0
+            self.centering_confirmations = 0
 
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
@@ -223,14 +227,10 @@ class PerformCentering(State):
 
         mavdrone = blackboard["mavdrone"]
 
-        red_center_state_topic = blackboard.get(
-            "red_center_state_topic",
-            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y",
-        )
-        red_vel_y_topic = blackboard.get(
-            "red_vel_y_topic", f"/{LINE_DETECTION_RED_COLOR_NAME}/velocity_y"
-        )
-
+        red_center_state_topic = blackboard["red_center_state_topic"]
+        
+        red_vel_y_topic = blackboard["red_vel_y_topic"] 
+            
         yasmin.YASMIN_LOG_INFO("Centering on red blob...")
         self.centering_confirmations = 0
         self.last_error_x = 0
@@ -241,13 +241,13 @@ class PerformCentering(State):
         )
 
         start_time = time.time()
-        timeout = 30
+        timeout = 25
 
         # Main control loop
         while time.time() - start_time < timeout:
             if self.update_control_effort:
                 mavdrone.offboard_velocity(
-                    linear_x=self.current_y_velocity,
+                    linear_x=-self.current_y_velocity,
                     linear_y=0.0,
                     linear_z=0.0,
                     angular_z=0.0,
