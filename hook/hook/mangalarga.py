@@ -45,7 +45,7 @@ class HangTheHookSM(StateMachine):
             "FOLLOW_BLUE_LINE",
             FollowBlueLineWithRedDetection(),
             transitions={
-                "red_detected": "CENTER_RED_BLOB",  
+                SUCCEED: "CENTER_RED_BLOB",  
                 ABORT: "RETURN_TO_LAUNCH",
             },
         )
