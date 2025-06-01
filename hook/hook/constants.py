@@ -1,5 +1,5 @@
 # Tekeoff
-TAKEOFF_ALTITUDE = 4.4
+TAKEOFF_ALTITUDE = 4.5
 
 # Line Detection Parameters
 LINE_DETECTION_BLUE_COLOR_NAME = "blue"
@@ -60,6 +60,6 @@ CENTERING_CONFIRMATIONS = 4  # Consecutive low effort confirmations
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 30  # Timeout for descent in seconds
 
-HOCK_SERVO_CHANNEL = 3 
+HOCK_SERVO_CHANNEL = 3
 HOCK_RELEASE_PWM = 2000.0
 HOCK_HOLD_PWM = 1000.0

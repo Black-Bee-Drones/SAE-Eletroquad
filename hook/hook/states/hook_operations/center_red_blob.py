@@ -7,6 +7,7 @@ from yasmin_ros.yasmin_node import YasminNode
 
 from mirela_sdk.utils.process import ProcessUtils
 from mirela_interfaces.msg import LineInfo
+from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 from std_msgs.msg import Float64
 
 from time import sleep
@@ -28,6 +29,7 @@ from hook.constants import (
     LINE_DETECTION_IMAGE_SOURCE,
     LINE_DETECTION_SHOW_VISUALIZATION,
     LINE_DETECTION_RED_CENTERING_TITLE,
+    TAKEOFF_ALTITUDE,
 )
 
 
@@ -85,7 +87,9 @@ class SetupRedLineStateRepublisher(State):
         self.red_center_setpoint_topic = (
             f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
         )
-        self.center_setpoint = IMAGE_CENTER_Y + 150
+        self.center_setpoint = IMAGE_CENTER_Y + ImageCalculus.calculate_offset_pixels(
+            0.12, TAKEOFF_ALTITUDE, 43.3, 480
+        )
 
     def line_info_callback(self, msg: LineInfo):
         """Callback for LineInfo messages, republishes center_y and setpoint"""
@@ -211,12 +215,14 @@ class PerformCentering(State):
     def control_effort_y_callback(self, msg: Float64):
         self.current_y_velocity = msg.data
         self.update_control_effort = True
-        
+
         yasmin.YASMIN_LOG_INFO(f"Vel y: {self.current_y_velocity}")
 
         if self.current_y_velocity <= 0.2:
             self.centering_confirmations += 1
-            yasmin.YASMIN_LOG_INFO(f"Confirmation center: {self.centering_confirmations}")
+            yasmin.YASMIN_LOG_INFO(
+                f"Confirmation center: {self.centering_confirmations}"
+            )
         else:
             self.centering_confirmations = 0
 
@@ -228,9 +234,9 @@ class PerformCentering(State):
         mavdrone = blackboard["mavdrone"]
 
         red_center_state_topic = blackboard["red_center_state_topic"]
-        
-        red_vel_y_topic = blackboard["red_vel_y_topic"] 
-            
+
+        red_vel_y_topic = blackboard["red_vel_y_topic"]
+
         yasmin.YASMIN_LOG_INFO("Centering on red blob...")
         self.centering_confirmations = 0
         self.last_error_x = 0
@@ -313,7 +319,10 @@ class CenterRedBlob(StateMachine):
         self.add_state(
             "START_RED_LINE_DETECTION",
             StartRedLineDetection(),
-            transitions={SUCCEED: "START_CENTERING_PID", ABORT: "CLEANUP_PROCESSES"},
+            transitions={
+                SUCCEED: "SETUP_RED_LINE_STATE_REPUBLISHER",
+                ABORT: "CLEANUP_PROCESSES",
+            },
         )
 
         self.add_state(
