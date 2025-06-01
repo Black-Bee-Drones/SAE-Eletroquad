@@ -25,7 +25,14 @@ class DepthMeasurement(Node):
 
         self.detector = ColorDetector("preset", "blue_sl")
 
+        self.declare_parameter("cap", 0)
+        cap_param = self.get_parameter("cap").value
+
+        if cap is None:
+            cap = cap_param
+
         self.cap = cv2.VideoCapture(cap)
+
         self.width = 0
 
         #Numero de pixels filtrado vezes a distancia da camera à esse numero de pixels
@@ -53,7 +60,7 @@ class DepthMeasurement(Node):
 
         pipe_area = np.zeros_like(self.detector.mask)
 
-        if len(longest_group) > 10:
+        if 69 > len(longest_group) > 15:
             begin = longest_group[0][1]
             end = longest_group[-1][1]
             self.width = longest_group[-1][0] + 1
@@ -80,7 +87,7 @@ class DepthMeasurement(Node):
         #print(f'{distance:.2f}')
         #print(pixels_nonzero)
 
-        #cv2.imshow("preview", frame)
+        cv2.imshow("preview", frame)
         #cv2.imshow("pipe_area", pipe_area)
         #cv2.imshow("result", self.pipe_in_roi)
         #cv2.imshow("mask", self.detector.mask)
@@ -110,21 +117,3 @@ class DepthMeasurement(Node):
         else:
             msg.data = 3
             self.find_pub.publish(msg) #ta mais pra direita
-        
-
-# def main():
-#     rclpy.init()
-    
-#     dp = DepthMeasurement(2)
-
-#     while True:
-#         dp.depth_callback()
-
-#         if cv2.waitKey(1) == ord('q'):
-#             cv2.destroyAllWindows()
-#             break
-#     rclpy.shutdown()
-
-
-
-# main()

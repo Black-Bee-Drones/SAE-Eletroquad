@@ -21,13 +21,6 @@ BLACK = 4
 
 class DepthStateMachine(DepthMeasurement):
     def __init__(self, cap = 0):
-
-        self.declare_parameter("cap", 0)
-        cap_param = self.get_parameter("cap").value
-
-        if cap is None:
-            cap = cap_param
-
         super().__init__(cap)
 
         self.state = START
@@ -74,7 +67,7 @@ class DepthStateMachine(DepthMeasurement):
             self.get_logger().info("Filtering BLACK")
             self.state = BLACK
             self.detector = self.black_detector
-            self.next_state = RED
+            self.next_state = PINK
         
 
         msg = Int8()
