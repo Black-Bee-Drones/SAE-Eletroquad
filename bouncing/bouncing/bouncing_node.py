@@ -1,6 +1,7 @@
 import rclpy
 import time
 import cv2
+import os
 import subprocess
 import re
 from rclpy.node import Node
@@ -28,7 +29,7 @@ class CameraFeed():
 
         C920_CTRL_MAP = {
             'HD Pro Webcam C920': 'focus_automatic_continuous=0',
-            'Logi Webcam C920e': 'focus_auto=0',
+            'Logi Webcam C920e': 'focus_automatic_continuous=0',
             }
         
         result = subprocess.run(['v4l2-ctl', '--list-devices'], capture_output=True, text=True)
@@ -67,7 +68,8 @@ class CameraFeed():
                 "Failed to apply all camera settings. Continuing, but performance may be degraded."
             )
 
-        self.model = YOLO("ai/yolov11n.pt") # MODELO DA IA -->> CONFERIR DIR
+        model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "best.onnx")
+        self.model = YOLO(model_path, task='detect')
 
     def take_photo(self) -> np.ndarray:
         """
