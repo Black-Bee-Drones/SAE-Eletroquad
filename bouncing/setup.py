@@ -23,10 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'bouncing_detector = bouncing.bouncing_detector:main',
-            'bouncing_manager = bouncing.bouncing_manager:main',
-            'bouncing_movement = bouncing.bouncing_movement:main',
-            'manual_publisher = bouncing.manual_publisher:main',
+            'bouncing_detector = bouncing.bouncing_node:main',
         ],
     },
 )

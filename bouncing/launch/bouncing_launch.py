@@ -5,20 +5,8 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='bouncing',
-            executable='bouncing_detector',
-            name='bouncing_detector',
-            output='screen'
-        ),
-        Node(
-            package='bouncing',
-            executable='bouncing_manager',
-            name='bouncing_manager',
-            output='screen'
-        ),
-        Node(
-            package='bouncing',
-            executable='bouncing_movement',
-            name='bouncing_movement',
+            executable='bouncing_node',
+            name='bouncing_node',
             output='screen'
         ),
     ])
