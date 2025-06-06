@@ -28,8 +28,8 @@ class CameraFeed():
         self.target_class = target_class
 
         C920_CTRL_MAP = {
-            'HD Pro Webcam C920': 'focus_automatic_continuous=0',
-            'Logi Webcam C920e': 'focus_automatic_continuous=0',
+            'HD Pro Webcam C920': 'focus_auto=0',
+            'Logi Webcam C920e': 'focus_auto=0',
             }
         
         result = subprocess.run(['v4l2-ctl', '--list-devices'], capture_output=True, text=True)
@@ -202,9 +202,9 @@ class BouncingNode(Node):
         - If the object is detected, navigates toward it and attempts to land.
         """
 
-        self.drone.takeoff(5.0)
+        self.drone.arm_takeoff(5.0)
 
-        time.sleep(5)
+        time.sleep(10)
 
         while(len(self.points_to_visit) > 0):
 
@@ -310,7 +310,17 @@ class BouncingNode(Node):
 
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node = BouncingNode("circle", 0, 0, 0, 0, 0, 0, 0, 0)
+    node = BouncingNode(
+        "house",
+        -22.4152503,
+        -45.4479286,
+        -22.4153305,
+        -45.4478092,
+        -22.4153082,
+        -45.4479674,
+        -22.4153965,
+        -45.4478671
+         )
     node.run()
     node.destroy_node()
     rclpy.shutdown()
