@@ -29,6 +29,8 @@ class MovementStateMachine(Node):
         self.distance_to_object = 0.0
         self.count_pipe = 0
         self.where_is_pipe = 0
+        self.lateral_position = 0.0
+        self.too_close = False
 
         self.changed_color_ok = 0
 
@@ -40,6 +42,12 @@ class MovementStateMachine(Node):
 
     def distance_callback(self, msg):
         self.distance_to_object = msg.data
+        if self.distance_to_object < 300:
+            self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
+            self.too_close = True
+        else:
+            self.too_close = False
+    
 
     def find_object_callback(self, msg):
         self.object_location = msg.data
@@ -82,31 +90,58 @@ class MovementStateMachine(Node):
 
         return self.object_location
 
+    def search(self):
+        while self.where_is_pipe == NOWHERE:
+            self.drone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=3)
+            self.where_is_pipe = self.right_or_left()
+            if self.where_is_pipe == 0:
+                vel = (-1) * abs(self.lateral_position)/self.lateral_position if self.lateral_position != 0 else 0.0
+                self.drone.offboard_velocity_timer(0.0, vel, 0.0, 0.0, time=abs(self.lateral_position))
+                self.lateral_position = 0
+                self.where_is_pipe = self.right_or_left()
+
+                if self.where_is_pipe == 0:
+                    self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=3)
+                    self.lateral_position += 3
+                    self.where_is_pipe = self.right_or_left()
+                    
+                    if self.where_is_pipe == 0:
+                        self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=6)
+                        self.lateral_position -= 6
+                        self.where_is_pipe = self.right_or_left()
+            rclpy.spin_once(self)
+
     def centralize(self):
         self.get_logger().info(f"entrei centralize, where_is_pipe: {self.where_is_pipe}")
         if self.where_is_pipe == NOWHERE:
-            self.drone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=3)
-            self.where_is_pipe = self.right_or_left()
-            self.centralize() #se nn achar, procura de novo
+            self.search()
 
         if self.where_is_pipe == LEFT:
             self.get_logger().info(f"LEFT object location: {self.object_location}")
+            start = time.time()
+            now = time.time()
             while self.object_location != CENTER:
                 self.get_logger().info("Moving drone to the left")
                 self.drone.offboard_velocity(0.0, 0.5, 0.0, 0.0)
+                now = time.time()
                 rclpy.spin_once(self)
+            self.lateral_position += now - start
 
         elif self.where_is_pipe == RIGHT:
             self.get_logger().info("RIGHT")
+            start = time.time()
+            now = time.time()
             while self.object_location != CENTER:
                 self.get_logger().info("Moving drone to the right")
                 self.drone.offboard_velocity(0.0, -0.5, 0.0, 0.0)
+                now = time.time()
                 rclpy.spin_once(self)
+            self.lateral_position -= now - start
+        
 
     def move_foward(self):
         self.get_logger().info("Drone going foward")
-        while self.distance_to_object > 300:
-            
+        while not self.too_close:
             self.drone.offboard_velocity(1.0, 0.0, 0.0, 0.0)
             rclpy.spin_once(self)
 
@@ -114,15 +149,17 @@ class MovementStateMachine(Node):
 
     def pass_by(self):
         if self.side == LEFT:
-            self.get_logger().info("Moving drone to the left for 5 seconds")
+            self.get_logger().info("Moving drone to the left for 2 seconds")
             self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=2.0)
+            self.lateral_position += 2
             self.side = RIGHT
         else:
-            self.get_logger().info("Moving drone to the right for 5 seconds")
+            self.get_logger().info("Moving drone to the right for 2 seconds")
             self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=2.0)
+            self.lateral_position -= 2
             self.side = LEFT
 
-        self.get_logger().info("Moving foward for 5 seconds")
+        self.get_logger().info("Moving foward for 3 seconds")
         self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=3.5)
 
     def movement_st(self):

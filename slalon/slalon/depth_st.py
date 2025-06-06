@@ -24,7 +24,7 @@ class DepthStateMachine(DepthMeasurement):
         super().__init__(cap)
 
         self.state = START
-        self.next_state = RED
+        self.next_state = BLACK
 
         self.depth_st_sub = self.create_subscription(Int8, "switch_state", self.switch_state_callback, 10)
 

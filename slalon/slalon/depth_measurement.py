@@ -6,17 +6,12 @@ from std_msgs.msg import Float32
 from std_msgs.msg import Int8
 from itertools import groupby
 from mirela_sdk.image_processing.color import ColorDetector
-from sensor_msgs.msg import CompressedImage
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
-import cvzone
 
 #Movimentação do drone conforme as cores
 #Altura max do drone é de 2.5 metros
 #O lado que se deve percorrer a primeira trave é fornecido no dia da prova
 
-#Cores traves: Preto fosco, Azul escuro, Rosa claro, Vermelho
 
-#filtro preto ta uma bosta
 
 class DepthMeasurement(Node):
     def __init__(self, cap=0):
@@ -30,20 +25,6 @@ class DepthMeasurement(Node):
 
         self.declare_parameter("cap", 0)
         cap_param = self.get_parameter("cap").value
-
-        # qos_profile = QoSProfile(
-        #     reliability=ReliabilityPolicy.BEST_EFFORT,  
-        #     history=HistoryPolicy.KEEP_LAST,
-        #     depth=1,  
-        #     durability=DurabilityPolicy.VOLATILE,
-        # )
-
-        # self.jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 80]
-
-
-        # self.image_pub = self.create_publisher(
-        #     CompressedImage, "slalon/image", qos_profile
-        # )
 
         if cap is None:
             cap = cap_param
@@ -91,33 +72,28 @@ class DepthMeasurement(Node):
         #Define uma linha no centro dessa matriz com valor 255, que será a área de detecção
         roi[240:241,:] = 255
 
+        pixels_in_roi = cv2.bitwise_and(self.detector.mask, roi)
+
+        #pixels_in_roi = cv2.cvtColor(pixels_in_roi, cv2.COLOR_BGR2GRAY)
+
         self.pipe_in_roi = cv2.bitwise_and(pipe_area, roi)
 
+        pixels_nonzero = np.count_nonzero(pixels_in_roi)
+
+
         #Regra de 3 para calcular a distancia baseado na variação do número de pixels
-        distance = self.const / self.width if self.width != 0 else 0.0
+        # distance = self.const / self.width if self.width != 0 else 0.0
+        distance = self.const / pixels_nonzero if pixels_nonzero != 0 else 0.0
+
         #print(f'distance: {distance}')
 
         msg = Float32()
         msg.data = float(distance)
         self.pub.publish(msg)
-
-        # current_time = self.get_clock().now().to_msg()
-
-        # _, compressed_data = cv2.imencode(".jpg", frame, self.jpeg_params)
-
-        # compressed_msg = CompressedImage()
-        # compressed_msg.header.stamp = current_time
-        # compressed_msg.header.frame_id = "camera_frame"
-        # compressed_msg.format = "jpeg"
-        # compressed_msg.data = compressed_data.tobytes()
-
-        # self.image_pub.publish(compressed_msg)
         
         #print(f'{distance:.2f}')
         #print(pixels_nonzero)
 
-        #stack = cvzone.stackImages([frame, self.detector.mask, pipe_area], 3, 0.7)
-        #cv2.imshow("frame  mask  pipe_area", stack)
         #cv2.imshow("preview", frame)
         #cv2.imshow("pipe_area", pipe_area)
         #cv2.imshow("result", self.pipe_in_roi)
