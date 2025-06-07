@@ -145,7 +145,7 @@ class StartCenteringPID(State):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
 
-        # Define topic names
+        # Define topic namesSAE-Eletroquad
         self.red_center_state_topic = (
             f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y"
         )
@@ -165,7 +165,9 @@ class StartCenteringPID(State):
 
         # Publish initial setpoint
         center_msg = Float64()
-        center_msg.data = IMAGE_CENTER_Y
+        center_msg.data = IMAGE_CENTER_Y + ImageCalculus.calculate_offset_pixels(
+            0.12, TAKEOFF_ALTITUDE, 43.3, 480
+        )
         center_setpoint_pub.publish(center_msg)
 
         centering_pid_cmd = (
@@ -218,7 +220,7 @@ class PerformCentering(State):
 
         yasmin.YASMIN_LOG_INFO(f"Vel y: {self.current_y_velocity}")
 
-        if self.current_y_velocity <= 0.2:
+        if self.current_y_velocity <= 0.03:
             self.centering_confirmations += 1
             yasmin.YASMIN_LOG_INFO(
                 f"Confirmation center: {self.centering_confirmations}"
@@ -247,20 +249,20 @@ class PerformCentering(State):
         )
 
         start_time = time.time()
-        timeout = 25
+        timeout = 3000
 
         # Main control loop
         while time.time() - start_time < timeout:
+            rclpy.spin_once(self.node)
+
             if self.update_control_effort:
                 mavdrone.offboard_velocity(
-                    linear_x=-self.current_y_velocity,
+                    linear_x=self.current_y_velocity,
                     linear_y=0.0,
                     linear_z=0.0,
                     angular_z=0.0,
                 )
             self.update_control_effort = False
-
-            rclpy.spin_once(self.node)
 
             if self.centering_confirmations >= CENTERING_CONFIRMATIONS:
                 mavdrone.offboard_velocity_timer(
