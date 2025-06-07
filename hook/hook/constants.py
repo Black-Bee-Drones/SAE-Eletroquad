@@ -1,5 +1,5 @@
 # Tekeoff
-TAKEOFF_ALTITUDE = 4.5
+TAKEOFF_ALTITUDE = 5.0
 
 # Line Detection Parameters
 LINE_DETECTION_BLUE_COLOR_NAME = "blue"
@@ -45,17 +45,17 @@ CENTER_OUTPUT_MAX = 0.7
 ANGLE_P = 0.013
 ANGLE_I = 0.0
 ANGLE_D = 0.001
-ANGLE_OUTPUT_MIN = -1.0
-ANGLE_OUTPUT_MAX = 1.0
+ANGLE_OUTPUT_MIN = -0.65
+ANGLE_OUTPUT_MAX = 0.65
 
 CENTERING_P = 0.003
 CENTERING_I = 0.0
 CENTERING_D = 0.0001
-CENTERING_OUTPUT_MIN = -0.8
-CENTERING_OUTPUT_MAX = 0.8
+CENTERING_OUTPUT_MIN = -0.5
+CENTERING_OUTPUT_MAX = 0.5
 
 MIN_RED_COUNT_CONFIRMATIONS = 8  # Consecutive frames above threshold
-CENTERING_CONFIRMATIONS = 4  # Consecutive low effort confirmations
+CENTERING_CONFIRMATIONS = 25  # Consecutive low effort confirmations
 
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 30  # Timeout for descent in seconds
