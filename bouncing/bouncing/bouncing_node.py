@@ -27,6 +27,8 @@ class CameraFeed():
 
         self.target_class = target_class
 
+        self.photo_count = 0
+
         C920_CTRL_MAP = {
             'HD Pro Webcam C920': 'focus_auto=0',
             'Logi Webcam C920e': 'focus_auto=0',
@@ -51,6 +53,8 @@ class CameraFeed():
                     break
             if device and ctrl_param:
                 subprocess.run(['v4l2-ctl', '-d', device, '--set-ctrl=' + ctrl_param])
+                subprocess.run(['v4l2-ctl', '-d', device, '--set-ctrl=' + 'exposure_auto=1'])
+                subprocess.run(['v4l2-ctl', '-d', device, '--set-ctrl=' + 'exposure_absolute=10'])
                 break
 
         if device is None:
@@ -73,7 +77,8 @@ class CameraFeed():
 
     def take_photo(self) -> np.ndarray:
         """
-        Captures a frame from the camera, crops it to a square (1:1), and resizes to 640x640.
+        Captures a frame from the camera, crops it to a square (1:1), resizes to 640x640,
+        and saves the image to the local directory.
 
         Returns:
             np.ndarray: Processed image frame ready for inference.
@@ -92,8 +97,15 @@ class CameraFeed():
         half_side = side // 2
         crop = frame[center_y - half_side:center_y + half_side, center_x - half_side:center_x + half_side]
 
-        # Resize para 640x640
-        return cv2.resize(crop, (640, 640), interpolation=cv2.INTER_AREA)
+        # Redimensionar para 640x640
+        resized = cv2.resize(crop, (640, 640), interpolation=cv2.INTER_AREA)
+
+        filename = f"photo{self.photo_count}.jpg"
+        self.photo_count += 1
+        cv2.imwrite(filename, resized)
+        
+        return resized
+
     
     def run_inference(self) -> Tuple[int, int]:
         """
@@ -202,7 +214,7 @@ class BouncingNode(Node):
         - If the object is detected, navigates toward it and attempts to land.
         """
 
-        self.drone.arm_takeoff(5.0)
+        self.drone.arm_takeoff(6.5)
 
         time.sleep(10)
 
@@ -211,16 +223,18 @@ class BouncingNode(Node):
             self.drone.offboard_gps_position(
                 lat_setpoint=self.points_to_visit[0][0], 
                 lon_setpoint=self.points_to_visit[0][1], 
-                alt_setpoint=5.0, 
+                alt_setpoint=6.5, 
                 heading=self.drone.gps_controller.calculate_bearing(self.points_to_visit[0][0], self.points_to_visit[0][1]),
                 precision_radius=0.1
             )
-
+            
+            self.get_logger().info(" --Running Inference--")
             x, y = self.camera.run_inference()
 
             rclpy.spin_once(self)
 
             if x != -1:
+                self.get_logger().info("Detected!")
                 if self.visit_detection(x, y): break
 
             self.points_to_visit.pop(0)
@@ -252,7 +266,7 @@ class BouncingNode(Node):
             centerpixel_width=320,
             pixel2_height=coord_y,
             pixel2_width=coord_x,
-            gdr= 1.1 / 161
+            gdr= 1.1 / 153.160047,
             )
         
         self.drone.offboard_gps_position(
@@ -263,7 +277,11 @@ class BouncingNode(Node):
             precision_radius=0.1
         )
 
-        return self.adjust_position()
+        self.drone.land()
+
+        return True
+
+        #return self.adjust_position()
 
     def adjust_position(self) -> bool:
         """
@@ -273,17 +291,23 @@ class BouncingNode(Node):
         Returns:
             bool: True if target still detected and drone lands, False otherwise.
         """
+        for _ in range(2):
+            x, y = self.camera.run_inference()
+            error_sides = 320 - x
+            error_front = 320 - y
+            self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
 
-        x, y = self.camera.run_inference()
-
-        if x != -1:
-            kp = 0.0
-            self.drone.offboard_velocity_timer(x*kp, y*kp, 0.0, 0.0, time=1)
-            self.drone.land()
-            return True
-        
-        else:
-            return False
+            if x != -1:
+                kp = 1 / 100
+                start_time = time.time()
+                while time.time() - start_time < 0.2:
+                    self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+            
+            else:
+                return False
+            
+        self.drone.land()
+        return True
 
     def points_calculation(self) -> None:
         """
