@@ -107,7 +107,7 @@ class SetupLineStateRepublisher(State):
         )
 
         # Define setpoint values
-        self.center_setpoint = IMAGE_CENTER_X
+        self.center_setpoint = IMAGE_CENTER_X 
         self.angle_setpoint = ANGLE_SETPOINT
 
     def line_info_callback(self, msg: LineInfo):
@@ -270,10 +270,6 @@ class FollowLineWithDetection(State):
         self.current_red_center_x = None
         self.current_y_velocity = 0.0
         self.current_angular_z = 0.0
-        self.filtered_angular_z = 0.0
-        self.angular_z_buffer = []
-        self.buffer_size = 4
-        self.max_angular_change = 0.3
         self.update_center = False
         self.update_angle = False
         self.node = YasminNode.get_instance()
@@ -296,47 +292,9 @@ class FollowLineWithDetection(State):
         self.update_center = True
 
     def control_effort_angular_z_callback(self, msg: Float64):
-        raw_angular_z = msg.data
-        
-        # Mantendo a ideia do buffer
-        self.angular_z_buffer.append(raw_angular_z)
-        if len(self.angular_z_buffer) > self.buffer_size:
-            self.angular_z_buffer.pop(0)
-        
-        # Pensei em um filtro uando a mediana para retirar outliers
-        median_angular_z = sorted(self.angular_z_buffer)[len(self.angular_z_buffer) // 2]
-
-        # Como filtro de bruscar variacoes, encontrei o EMA (filtro exponencial movel)
-        self.filtered_angular_z = (
-            self.alpha_EMA * median_angular_z + (1 - self.alpha_EMA) * self.filtered_angular_z
-        )
-        self.current_angular_z = self.filtered_angular_z
+        self.current_angular_z = msg.data
         self.update_angle = True
         
-
-        # def control_effort_angular_z_callback(self, msg: Float64):
-        #     raw_angular_z = msg.data
-
-        #     if len(self.angular_z_buffer) == 0:
-        #         self.filtered_angular_z = raw_angular_z
-        #     else:
-        #         change = abs(raw_angular_z - self.filtered_angular_z)
-        #         if change > self.max_angular_change and len(self.angular_z_buffer) >= 2:
-        #             recent_avg = sum(self.angular_z_buffer[-2:]) / 2
-        #             if abs(raw_angular_z - recent_avg) > self.max_angular_change:
-        #                 self.filtered_angular_z = recent_avg
-        #             else:
-        #                 self.filtered_angular_z = raw_angular_z
-        #         else:
-        #             self.filtered_angular_z = raw_angular_z
-
-        #     self.angular_z_buffer.append(self.filtered_angular_z)
-        #     if len(self.angular_z_buffer) > self.buffer_size:
-        #         self.angular_z_buffer.pop(0)
-
-        #     self.current_angular_z = self.filtered_angular_z
-        #     self.update_angle = True
-
     def execute(self, blackboard: Blackboard):
         if not "mavdrone" in blackboard:
             yasmin.YASMIN_LOG_ERROR(
