@@ -75,6 +75,7 @@ class CameraFeed():
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "best.onnx")
         self.model = YOLO(model_path, task='detect')
 
+
     def take_photo(self) -> np.ndarray:
         """
         Captures a frame from the camera, crops it to a square (1:1), resizes to 640x640,
@@ -216,7 +217,10 @@ class BouncingNode(Node):
 
         self.drone.arm_takeoff(6.5)
 
-        time.sleep(10)
+        #running first inference for pre-compiling the model
+        self.camera.run_inference()
+
+        time.sleep(5.0)
 
         while(len(self.points_to_visit) > 0):
 
@@ -245,7 +249,7 @@ class BouncingNode(Node):
 
 
         
-    def visit_detection(self, coord_x, coord_y) -> bool:
+    def visit_detection(self, coord_x: int, coord_y: int) -> bool:
         """
         Converts the pixel coordinates of the detection into GPS coordinates,
         then navigates the drone to the target location.
@@ -258,16 +262,21 @@ class BouncingNode(Node):
             bool: True if the object was successfully re-identified and landed on, False otherwise.
         """
 
-        lat, lon = ImageCalculus.find_coordinate(
-            centerpixel_lat=self.drone.get_gps.latitude,
-            centerpixel_lon=self.drone.get_gps.longitude,
-            bearing=self.drone.get_heading.data,
-            centerpixel_height=320,
-            centerpixel_width=320,
-            pixel2_height=coord_y,
-            pixel2_width=coord_x,
-            gdr= 1.1 / 153.160047,
-            )
+        drone_height = self.drone.get_gps.altitude - self.drone.initial_altitude
+        camera_displacement = ImageCalculus.calculate_offset_pixels(
+            0.12, drone_height, 43.3, 640
+        )
+        
+        lat, lon = ImageCalculus.estimate_pixel_gps(
+            origin_lat=self.drone.get_gps.latitude,
+            origin_lon=self.drone.get_gps.longitude,
+            origin_row=320 + camera_displacement,
+            origin_col=320,
+            target_row=coord_x,
+            target_col=coord_y,
+            gsd= 1.1 / 145,
+            image_bearing=self.drone.get_heading.data
+        )
         
         self.drone.offboard_gps_position(
             lat_setpoint=lat,
@@ -292,9 +301,17 @@ class BouncingNode(Node):
             bool: True if target still detected and drone lands, False otherwise.
         """
         for _ in range(2):
+            
+            drone_height = self.drone.get_gps.altitude - self.drone.initial_altitude
+
             x, y = self.camera.run_inference()
+
+            camera_displacement = ImageCalculus.calculate_offset_pixels(
+                0.12, drone_height, 43.3, 640
+            )
+
             error_sides = 320 - x
-            error_front = 320 - y
+            error_front = y - 320 - camera_displacement
             self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
 
             if x != -1:
