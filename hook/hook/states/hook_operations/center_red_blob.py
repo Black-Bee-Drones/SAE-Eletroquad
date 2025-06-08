@@ -270,7 +270,6 @@ class PerformCentering(State):
                     linear_y=0.0,
                     linear_z=0.0,
                     angular_z=0.0,
-                    time=1.0,
                 )
                 yasmin.YASMIN_LOG_INFO("Red blob centered.")
                 self._cleanup_subscribers()

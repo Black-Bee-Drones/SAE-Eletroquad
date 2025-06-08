@@ -10,6 +10,7 @@ import time
 from hook.constants import MIN_DESCEND_ALTITUDE, DESCEND_TIMEOUT
 
 
+
 class PerformDescent(State):
     """
     Perform the descent operation based on height data from gps
@@ -42,7 +43,7 @@ class PerformDescent(State):
             yasmin.YASMIN_LOG_INFO(f"Current altitude: {rel_alt:.2f}m")
 
             diff = abs(rel_alt) - MIN_DESCEND_ALTITUDE
-            if abs(diff) < 0.10:
+            if abs(diff) <= 0.15:
                 yasmin.YASMIN_LOG_INFO("Reached the mininum safe altitude.")
                 mavdrone.offboard_velocity(
                     linear_x=0.0, linear_y=0.0, linear_z=0.0, angular_z=0.0
@@ -50,9 +51,11 @@ class PerformDescent(State):
                 return SUCCEED
 
             if diff < 0.0:
-                mavdrone.offboard_velocity(0.0, 0.0, -0.22 * diff, 0.0)
+                mavdrone.offboard_velocity(0.0, 0.0, 0.2 * abs(diff), 0.0)
             else:
-                mavdrone.offboard_velocity(0.0, 0.0, 0.22 * diff, 0.0)
+                mavdrone.offboard_velocity(0.0, 0.0, -0.2 * diff, 0.0)
+            
+            rclpy.spin_once(self.node)
 
         yasmin.YASMIN_LOG_ERROR("Failed to descend to hook (timeout)")
         return ABORT
