@@ -3,3 +3,12 @@
 logs/
 log/
 node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+mav.log
+mav.tlog
+mav.*
