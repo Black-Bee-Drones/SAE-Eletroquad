@@ -51,10 +51,7 @@ class CameraFeed():
                             break
                         j += 1
                     break
-            if device and ctrl_param:
-                subprocess.run(['v4l2-ctl', '-d', device, '--set-ctrl=' + ctrl_param])
-                subprocess.run(['v4l2-ctl', '-d', device, '--set-ctrl=' + 'exposure_auto=1'])
-                subprocess.run(['v4l2-ctl', '-d', device, '--set-ctrl=' + 'exposure_absolute=10'])
+            if device:
                 break
 
         if device is None:
@@ -66,6 +63,15 @@ class CameraFeed():
         success &= self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         success &= self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         success &= self.cap.set(cv2.CAP_PROP_FPS, 30)
+
+        print("setei parametro camera")
+
+        subprocess.run([
+            'v4l2-ctl', '-d', device, 
+            '--set-ctrl=' + ctrl_param,
+            '--set-ctrl=exposure_auto=1', 
+            '--set-ctrl=exposure_absolute=10'
+            ])
 
         if not success:
             print(
@@ -193,6 +199,8 @@ class BouncingNode(Node):
         self.search_point_4a: Tuple[float, float]
         self.search_point_4b: Tuple[float, float]
 
+        self.photos_heading: float
+
         self.points_calculation()
 
         self.points_to_visit: List[Tuple[float, float]] = [
@@ -217,10 +225,12 @@ class BouncingNode(Node):
 
         self.drone.arm_takeoff(6.5)
 
-        #running first inference for pre-compiling the model
-        self.camera.run_inference()
+        time.sleep(8.0)
 
-        time.sleep(5.0)
+        #running first inference for pre-compiling the model
+        x, y = self.camera.run_inference()
+        if x != -1:
+            self.visit_detection(x, y)
 
         while(len(self.points_to_visit) > 0):
 
@@ -228,7 +238,7 @@ class BouncingNode(Node):
                 lat_setpoint=self.points_to_visit[0][0], 
                 lon_setpoint=self.points_to_visit[0][1], 
                 alt_setpoint=6.5, 
-                heading=self.drone.gps_controller.calculate_bearing(self.points_to_visit[0][0], self.points_to_visit[0][1]),
+                heading=self.photos_heading,
                 precision_radius=0.1
             )
             
@@ -263,17 +273,22 @@ class BouncingNode(Node):
         """
 
         drone_height = self.drone.get_gps.altitude - self.drone.initial_altitude
+        self.get_logger().info(f"drone height: {drone_height}")
         camera_displacement = ImageCalculus.calculate_offset_pixels(
             0.12, drone_height, 43.3, 640
         )
+
+        self.get_logger().info(f"drone center: {320 - camera_displacement}")
+
+        
         
         lat, lon = ImageCalculus.estimate_pixel_gps(
             origin_lat=self.drone.get_gps.latitude,
             origin_lon=self.drone.get_gps.longitude,
-            origin_row=320 + camera_displacement,
+            origin_row=320 - camera_displacement,
             origin_col=320,
-            target_row=coord_x,
-            target_col=coord_y,
+            target_row=coord_y,
+            target_col=coord_x,
             gsd= 1.1 / 145,
             image_bearing=self.drone.get_heading.data
         )
@@ -347,6 +362,18 @@ class BouncingNode(Node):
         self.search_point_2b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 3/8)
         self.search_point_3b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 5/8)
         self.search_point_4b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 7/8)
+
+        lat, lon, lat1, lon1 = map(np.radians, [self.search_point_1a[0], self.search_point_1a[1], self.search_point_4a[0], self.search_point_4a[1]])
+
+        dlon = lon - lon1
+
+        x = np.sin(dlon) * np.cos(lat)
+        y = np.cos(lat1) * np.sin(lat) - (np.sin(lat1) * np.cos(lat) * np.cos(dlon))
+        bearing = np.arctan2(x, y)
+
+        bearing = np.degrees(bearing)
+
+        self.photos_heading = (bearing + 360) % 360
 
 
 def main(args=None) -> None:
