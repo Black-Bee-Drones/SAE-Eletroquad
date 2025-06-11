@@ -36,7 +36,7 @@ class CameraFeed():
         
         result = subprocess.run(['v4l2-ctl', '--list-devices'], capture_output=True, text=True)
         lines = result.stdout.splitlines()
-        device = None
+        self.device = None
         ctrl_param = None
 
         for i, line in enumerate(lines):
@@ -47,36 +47,17 @@ class CameraFeed():
                     while j < len(lines) and lines[j].startswith('\t'):
                         match = re.search(r'(/dev/video\d+)', lines[j])
                         if match:
-                            device = match.group(1)
+                            self.device = match.group(1)
                             break
                         j += 1
                     break
-            if device:
+            if self.device:
                 break
 
-        if device is None:
+        if self.device is None:
             raise RuntimeError("C920 camera not detected. Please ensure the device is connected and that 'v4l2-ctl' is installed.")
         
-        self.cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
-        success = True
-        success &= self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        success &= self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        success &= self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        success &= self.cap.set(cv2.CAP_PROP_FPS, 30)
-
-        print("setei parametro camera")
-
-        subprocess.run([
-            'v4l2-ctl', '-d', device, 
-            '--set-ctrl=' + ctrl_param,
-            '--set-ctrl=exposure_auto=1', 
-            '--set-ctrl=exposure_absolute=10'
-            ])
-
-        if not success:
-            print(
-                "Failed to apply all camera settings. Continuing, but performance may be degraded."
-            )
+       self.exposure = 3
 
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "best.onnx")
         self.model = YOLO(model_path, task='detect')
@@ -91,18 +72,44 @@ class CameraFeed():
             np.ndarray: Processed image frame ready for inference.
         """
 
-        ret, frame = self.cap.read()
-        if not ret:
-            time.sleep(0.5)
-            ret, frame = self.cap.read()
-            if not ret:
-                raise RuntimeError("Falha ao capturar frame da câmera.")
+        output_path = "output.jgp"
+        image = None
+
+        try:
+            # 1. Configura a exposição
+            subprocess.run([
+                "v4l2-ctl", "-d", self.device,
+                "-c", "focus_auto=0",
+                "-c", "exposure_auto=1",
+                "-c", f"exposure_absolute={self.exposure}"
+            ], check=True)
+
+            # 2. Captura uma imagem com ffmpeg
+            subprocess.run([
+                "ffmpeg",
+                "-f", "video4linux2",
+                "-input_format", "mjpeg",
+                "-video_size", "1920x1080",
+                "-i", self.device,
+                "-frames:v", "1",
+                output_path,
+                "-y",  # sobrescreve
+                "-loglevel", "quiet"  # silencioso
+            ], check=True)
+
+            # 3. Carrega a imagem no OpenCV
+            image = cv2.imread(output_path)
+            if image is None:
+                raise RuntimeError("Erro ao carregar a imagem.")
+
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Erro ao executar subprocesso: {e}")
 
         # Cortar para 1:1 centralizado (quadrado)
         side = 1080
         center_x, center_y = 1920 // 2, 1080 // 2
         half_side = side // 2
-        crop = frame[center_y - half_side:center_y + half_side, center_x - half_side:center_x + half_side]
+        crop = image[center_y - half_side:center_y + half_side, center_x - half_side:center_x + half_side]
 
         # Redimensionar para 640x640
         resized = cv2.resize(crop, (640, 640), interpolation=cv2.INTER_AREA)
@@ -124,17 +131,15 @@ class CameraFeed():
         
         frame = self.take_photo()
         results = self.model(frame)[0]
-        x, y = -1, -1
+        x1, y1, x2, y2 = -1, -1, -1, -1
         for box in results.boxes:
             cls = int(box.cls.item())
             if cls == self.target_class:
                 detected = True
 
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
-                x = int((x1 + x2) / 2)
-                y = int((y1 + y2) / 2)
                 break
-        return x, y
+        return x1, y1, x2, y2
 
 
 
@@ -228,8 +233,12 @@ class BouncingNode(Node):
         time.sleep(8.0)
 
         #running first inference for pre-compiling the model
-        x, y = self.camera.run_inference()
-        if x != -1:
+        x1, y1, x2, y2 = self.camera.run_inference()
+
+        x = (x1 + x2) // 2
+        y = (y1 + y2) // 2
+
+        if x1 != -1:
             self.visit_detection(x, y)
 
         while(len(self.points_to_visit) > 0):
@@ -243,8 +252,10 @@ class BouncingNode(Node):
             )
             
             self.get_logger().info(" --Running Inference--")
-            x, y = self.camera.run_inference()
+            x1, y1, x2, y2 = self.camera.run_inference()
 
+            x = (x1 + x2) // 2
+            y = (y1 + y2) // 2
             rclpy.spin_once(self)
 
             if x != -1:
@@ -271,35 +282,31 @@ class BouncingNode(Node):
         Returns:
             bool: True if the object was successfully re-identified and landed on, False otherwise.
         """
-
-        drone_height = self.drone.get_gps.altitude - self.drone.initial_altitude
-        self.get_logger().info(f"drone height: {drone_height}")
         camera_displacement = ImageCalculus.calculate_offset_pixels(
-            0.12, drone_height, 43.3, 640
+            0.12, 6.5, 43.3, 640
         )
 
         self.get_logger().info(f"drone center: {320 - camera_displacement}")
 
         
+        # lat, lon = ImageCalculus.estimate_pixel_gps(
+        #     origin_lat=self.drone.get_gps.latitude,
+        #     origin_lon=self.drone.get_gps.longitude,
+        #     origin_row=320 - camera_displacement,
+        #     origin_col=320,
+        #     target_row=coord_y,
+        #     target_col=coord_x,
+        #     gsd= 1.1 / 145,
+        #     image_bearing=self.drone.get_heading.data
+        # )
         
-        lat, lon = ImageCalculus.estimate_pixel_gps(
-            origin_lat=self.drone.get_gps.latitude,
-            origin_lon=self.drone.get_gps.longitude,
-            origin_row=320 - camera_displacement,
-            origin_col=320,
-            target_row=coord_y,
-            target_col=coord_x,
-            gsd= 1.1 / 145,
-            image_bearing=self.drone.get_heading.data
-        )
-        
-        self.drone.offboard_gps_position(
-            lat_setpoint=lat,
-            lon_setpoint=lon,
-            alt_setpoint=5.0,
-            heading=self.drone.gps_controller.calculate_bearing(lat, lon),
-            precision_radius=0.1
-        )
+        # self.drone.offboard_gps_position(
+        #     lat_setpoint=lat,
+        #     lon_setpoint=lon,
+        #     alt_setpoint=5.0,
+        #     heading=self.drone.gps_controller.calculate_bearing(lat, lon),
+        #     precision_radius=0.1
+        # )
 
         self.drone.land()
 
@@ -315,31 +322,72 @@ class BouncingNode(Node):
         Returns:
             bool: True if target still detected and drone lands, False otherwise.
         """
-        for _ in range(2):
-            
-            drone_height = self.drone.get_gps.altitude - self.drone.initial_altitude
 
-            x, y = self.camera.run_inference()
+        x1, y1, x2, y2 = self.camera.run_inference()
 
-            camera_displacement = ImageCalculus.calculate_offset_pixels(
-                0.12, drone_height, 43.3, 640
-            )
+        x = (x1 + x2) // 2
+        y = (y1 + y2) // 2
 
-            error_sides = 320 - x
-            error_front = y - 320 - camera_displacement
-            self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
+        side_length = max(x2 - x1, y2 - y1)
+        
+        gsd = 0.80 / side_length
 
-            if x != -1:
-                kp = 1 / 100
-                start_time = time.time()
-                while time.time() - start_time < 0.2:
-                    self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
-            
-            else:
-                return False
-            
-        self.drone.land()
-        return True
+        drone_height = 320 * side_length / np.tan(np.radians(43.3/2))
+
+        self.get_logger().info(f"drone height calculated pixel: {drone_height}")
+
+        camera_displacement = ImageCalculus.calculate_offset_pixels(
+            0.12, drone_height, 43.3, 640
+        )
+
+        error_sides = 320 - x
+        error_front = y - 320 - camera_displacement
+        self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
+
+        if x != -1:
+            kp = 1 / 100
+            start_time = time.time()
+            while time.time() - start_time < 0.2:
+                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+        
+            return self.adjust_and_land()
+        else:
+            return False
+
+    def adjust_and_land(self):
+
+        x1, y1, x2, y2 = self.camera.run_inference()
+
+        x = (x1 + x2) // 2
+        y = (y1 + y2) // 2
+
+        side_length = max(x2 - x1, y2 - y1)
+        
+        gsd = 0.80 / side_length
+
+        drone_height = 320 * side_length / np.tan(np.radians(43.3/2))
+
+        self.get_logger().info(f"drone height calculated pixel: {drone_height}")
+
+        camera_displacement = ImageCalculus.calculate_offset_pixels(
+            0.12, drone_height, 43.3, 640
+        )
+
+        error_sides = 320 - x
+        error_front = y - 320 - camera_displacement
+        self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
+
+        if x != -1:
+            kp = 1 / 100
+            start_time = time.time()
+            while time.time() - start_time < 0.2:
+                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+        
+            self.drone.land()
+
+            return True
+        else:
+            return False
 
     def points_calculation(self) -> None:
         """
