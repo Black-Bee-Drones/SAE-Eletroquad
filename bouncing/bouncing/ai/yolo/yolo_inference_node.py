@@ -18,7 +18,9 @@ class YOLOv8Node(Node):
         self.declare_parameter(
             "model_path",
             os.path.abspath(
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), "best.onnx")
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), "models", "best.onnx"
+                )
             ),
         )
         self.declare_parameter("conf_thres", 0.5)
@@ -63,9 +65,11 @@ class YOLOv8Node(Node):
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(img_rgb)
 
-        _, detections = self.yolo.detect(
+        _, detections, inference_time_ms = self.yolo.detect(
             pil_img, conf_thres=self.conf_thres, iou_thres=self.iou_thres
         )
+
+        print(f"Inference time: {inference_time_ms:.2f} ms")
 
         centers = []
         ids = []

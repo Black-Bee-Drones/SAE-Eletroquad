@@ -42,8 +42,8 @@ class YOLOv8:
             ["OpenVINOExecutionProvider"], [{"device_type": "CPU"}]
         )
 
-        self.input_width = 640
-        self.input_height = 640
+        self.input_width = 320
+        self.input_height = 320
 
     def draw_detections(self, img, box, score, class_id):
         """
