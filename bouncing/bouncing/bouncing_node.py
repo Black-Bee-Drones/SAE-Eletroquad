@@ -57,7 +57,7 @@ class CameraFeed():
         if self.device is None:
             raise RuntimeError("C920 camera not detected. Please ensure the device is connected and that 'v4l2-ctl' is installed.")
         
-       self.exposure = 3
+        self.exposure = 3
 
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "best.onnx")
         self.model = YOLO(model_path, task='detect')
@@ -72,30 +72,30 @@ class CameraFeed():
             np.ndarray: Processed image frame ready for inference.
         """
 
-        output_path = "output.jgp"
+        output_path = "output.jpg"
         image = None
 
         try:
             # 1. Configura a exposição
             subprocess.run([
-                "v4l2-ctl", "-d", self.device,
+                "/usr/bin/v4l2-ctl", "-d", self.device,
                 "-c", "focus_auto=0",
                 "-c", "exposure_auto=1",
-                "-c", f"exposure_absolute={self.exposure}"
+                "-c", f"exposure_absolute=300"
             ], check=True)
 
             # 2. Captura uma imagem com ffmpeg
             subprocess.run([
-                "ffmpeg",
-                "-f", "video4linux2",
-                "-input_format", "mjpeg",
-                "-video_size", "1920x1080",
-                "-i", self.device,
-                "-frames:v", "1",
-                output_path,
-                "-y",  # sobrescreve
-                "-loglevel", "quiet"  # silencioso
-            ], check=True)
+            "/usr/bin/ffmpeg",
+            "-f", "video4linux2",
+            "-input_format", "mjpeg",
+            "-video_size", "1920x1080",
+            "-i", "/dev/video0",
+            "-frames:v", "1",
+            "output.jpg",
+            "-y",
+            "-loglevel", "quiet"
+        ], check=True)
 
             # 3. Carrega a imagem no OpenCV
             image = cv2.imread(output_path)
@@ -286,27 +286,27 @@ class BouncingNode(Node):
             0.12, 6.5, 43.3, 640
         )
 
-        self.get_logger().info(f"drone center: {320 - camera_displacement}")
+        self.get_logger().info(f"drone center: {320 + camera_displacement} | x:{coord_x} | y:{coord_y}")
 
         
-        # lat, lon = ImageCalculus.estimate_pixel_gps(
-        #     origin_lat=self.drone.get_gps.latitude,
-        #     origin_lon=self.drone.get_gps.longitude,
-        #     origin_row=320 - camera_displacement,
-        #     origin_col=320,
-        #     target_row=coord_y,
-        #     target_col=coord_x,
-        #     gsd= 1.1 / 145,
-        #     image_bearing=self.drone.get_heading.data
-        # )
+        lat, lon = ImageCalculus.estimate_pixel_gps(
+            origin_lat=self.drone.get_gps.latitude,
+            origin_lon=self.drone.get_gps.longitude,
+            origin_row=320 + camera_displacement,
+            origin_col=320,
+            target_row=coord_y,
+            target_col=coord_x,
+            gsd= 1.1 / 145,
+            image_bearing=self.drone.get_heading.data
+        )
         
-        # self.drone.offboard_gps_position(
-        #     lat_setpoint=lat,
-        #     lon_setpoint=lon,
-        #     alt_setpoint=5.0,
-        #     heading=self.drone.gps_controller.calculate_bearing(lat, lon),
-        #     precision_radius=0.1
-        # )
+        self.drone.offboard_gps_position(
+            lat_setpoint=lat,
+            lon_setpoint=lon,
+            alt_setpoint=5.0,
+            heading=self.drone.gps_controller.calculate_bearing(lat, lon),
+            precision_radius=0.1
+        )
 
         self.drone.land()
 
@@ -428,15 +428,23 @@ def main(args=None) -> None:
     rclpy.init(args=args)
     node = BouncingNode(
         "house",
-        -22.4152503,
-        -45.4479286,
-        -22.4153305,
-        -45.4478092,
-        -22.4153082,
-        -45.4479674,
-        -22.4153965,
-        -45.4478671
-         )
+        -22.4136107,
+        -45.44662,
+        -22.4135038,
+        -45.4465338,
+        -22.413543,
+        -45.4464616,
+        -22.4136517,
+        -45.4465533
+        # -22.4152503,
+        # -45.4479286,
+        # -22.4153305,
+        # -45.4478092,
+        # -22.4153082,
+        # -45.4479674,
+        # -22.4153965,
+        # -45.4478671
+          )
     node.run()
     node.destroy_node()
     rclpy.shutdown()
