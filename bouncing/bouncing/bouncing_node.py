@@ -29,20 +29,18 @@ class CameraFeed():
 
         self.photo_count = 0
 
-        C920_CTRL_MAP = {
-            'HD Pro Webcam C920': 'focus_auto=0',
-            'Logi Webcam C920e': 'focus_auto=0',
-            }
+        C920_DEVICES = [
+            'HD Pro Webcam C920',
+            'Logi Webcam C920e',
+        ]
         
         result = subprocess.run(['v4l2-ctl', '--list-devices'], capture_output=True, text=True)
         lines = result.stdout.splitlines()
         self.device = None
-        ctrl_param = None
 
         for i, line in enumerate(lines):
-            for model_name, param in C920_CTRL_MAP.items():
+            for model_name in C920_DEVICES:
                 if model_name in line:
-                    ctrl_param = param
                     j = i + 1
                     while j < len(lines) and lines[j].startswith('\t'):
                         match = re.search(r'(/dev/video\d+)', lines[j])
@@ -59,7 +57,8 @@ class CameraFeed():
         
         self.exposure = 3
 
-        model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "best.onnx")
+        model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "YOLOv11p.onnx")
+        self.model_output_size = 320
         self.model = YOLO(model_path, task='detect')
 
 
@@ -112,7 +111,7 @@ class CameraFeed():
         crop = image[center_y - half_side:center_y + half_side, center_x - half_side:center_x + half_side]
 
         # Redimensionar para 640x640
-        resized = cv2.resize(crop, (640, 640), interpolation=cv2.INTER_AREA)
+        resized = cv2.resize(crop, (self.model_output_size, self.model_output_size), interpolation=cv2.INTER_AREA)
 
         filename = f"photo{self.photo_count}.jpg"
         self.photo_count += 1
@@ -296,17 +295,17 @@ class BouncingNode(Node):
             bool: True if the object was successfully re-identified and landed on, False otherwise.
         """
         camera_displacement = ImageCalculus.calculate_offset_pixels(
-            0.12, 6.5, 43.3, 640
+            0.12, 6.5, 43.3, self.camera.model_output_size
         )
 
-        self.get_logger().info(f"drone center: {320 + camera_displacement} | x:{coord_x} | y:{coord_y}")
+        self.get_logger().info(f"drone center: {(self.camera.model_output_size / 2) + camera_displacement} | x:{coord_x} | y:{coord_y}")
 
         
         lat, lon = ImageCalculus.estimate_pixel_gps(
             origin_lat=self.drone.get_gps.latitude,
             origin_lon=self.drone.get_gps.longitude,
-            origin_row=320 + camera_displacement,
-            origin_col=320,
+            origin_row=(self.camera.model_output_size / 2) + camera_displacement,
+            origin_col=(self.camera.model_output_size / 2),
             target_row=coord_y,
             target_col=coord_x,
             gsd= 1.1 / 145,
@@ -336,16 +335,16 @@ class BouncingNode(Node):
             
             gsd = self.figure_size / side_length
 
-            drone_height = 320 * gsd / np.tan(np.radians(43.3/2))
+            drone_height = (self.camera.model_output_size / 2) * gsd / np.tan(np.radians(43.3/2))
 
             self.get_logger().info(f"drone height calculated pixel: {drone_height}")
 
             camera_displacement = ImageCalculus.calculate_offset_pixels(
-                0.12, drone_height, 43.3, 640
+                0.12, drone_height, 43.3, self.camera.model_output_size
             )
 
-            error_sides = 320 - x
-            error_front = 320 + camera_displacement - y
+            error_sides = (self.camera.model_output_size / 2) - x
+            error_front = (self.camera.model_output_size / 2) + camera_displacement - y
             self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
 
         return gsd * error_front, gsd * error_sides
