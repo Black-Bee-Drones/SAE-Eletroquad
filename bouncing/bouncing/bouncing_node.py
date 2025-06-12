@@ -81,7 +81,7 @@ class CameraFeed():
                 "/usr/bin/v4l2-ctl", "-d", self.device,
                 "-c", "focus_auto=0",
                 "-c", "exposure_auto=1",
-                "-c", f"exposure_absolute=300"
+                "-c", f"exposure_absolute={self.exposure}"
             ], check=True)
 
             # 2. Captura uma imagem com ffmpeg
@@ -180,7 +180,20 @@ class BouncingNode(Node):
             "house": 7
         }
 
+        figure_size_map: dict[int, float] = {
+            0: 0.8,
+            1: 0.8,
+            2: 0.8,
+            3: 0.8,
+            4: 0.8,
+            5: 0.8,
+            6: 0.8,
+            7: 0.715
+        }
+
         self.figure_class = figure_map.get(figure, None)
+
+        self.figure_size = figure_size_map.get(self.figure_class, None)
         
         if self.figure_class is None:
             raise ValueError(f"Figura '{figure}' inválida. Opções válidas: {list(figure_map.keys())}")
@@ -308,11 +321,35 @@ class BouncingNode(Node):
             precision_radius=0.1
         )
 
-        self.drone.land()
+        return self.adjust_position()
 
-        return True
+    def calculate_error(self) -> Tuple[float, float]:
+        x1, y1, x2, y2 = self.camera.run_inference()
 
-        #return self.adjust_position()
+        error_front, error_sides = None, None
+
+        if x1 >= 0:
+            x = (x1 + x2) // 2
+            y = (y1 + y2) // 2
+
+            side_length = max(x2 - x1, y2 - y1)
+            
+            gsd = self.figure_size / side_length
+
+            drone_height = 320 * gsd / np.tan(np.radians(43.3/2))
+
+            self.get_logger().info(f"drone height calculated pixel: {drone_height}")
+
+            camera_displacement = ImageCalculus.calculate_offset_pixels(
+                0.12, drone_height, 43.3, 640
+            )
+
+            error_sides = 320 - x
+            error_front = 320 + camera_displacement - y
+            self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
+
+        return gsd * error_front, gsd * error_sides
+
 
     def adjust_position(self) -> bool:
         """
@@ -323,66 +360,37 @@ class BouncingNode(Node):
             bool: True if target still detected and drone lands, False otherwise.
         """
 
-        x1, y1, x2, y2 = self.camera.run_inference()
-
-        x = (x1 + x2) // 2
-        y = (y1 + y2) // 2
-
-        side_length = max(x2 - x1, y2 - y1)
-        
-        gsd = 0.80 / side_length
-
-        drone_height = 320 * side_length / np.tan(np.radians(43.3/2))
-
-        self.get_logger().info(f"drone height calculated pixel: {drone_height}")
-
-        camera_displacement = ImageCalculus.calculate_offset_pixels(
-            0.12, drone_height, 43.3, 640
-        )
-
-        error_sides = 320 - x
-        error_front = y - 320 - camera_displacement
-        self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
-
-        if x != -1:
-            kp = 1 / 100
+        error_front, error_sides = self.calculate_error()
+        if error_front != None:
+            kp = 0.5
             start_time = time.time()
+            self.get_logger().info(f"Moving drone with: x:{error_front*kp} | y:{error_sides*kp}")
             while time.time() - start_time < 0.2:
-                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
-        
-            return self.adjust_and_land()
+                #self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+                break
+            self.get_logger().info(f"Finished first adjust")
+
+            self.drone.land()
+
+            return True
+
+            #return self.adjust_and_land()
         else:
             return False
 
     def adjust_and_land(self):
 
-        x1, y1, x2, y2 = self.camera.run_inference()
+        error_front, error_sides = self.calculate_error()
 
-        x = (x1 + x2) // 2
-        y = (y1 + y2) // 2
-
-        side_length = max(x2 - x1, y2 - y1)
-        
-        gsd = 0.80 / side_length
-
-        drone_height = 320 * side_length / np.tan(np.radians(43.3/2))
-
-        self.get_logger().info(f"drone height calculated pixel: {drone_height}")
-
-        camera_displacement = ImageCalculus.calculate_offset_pixels(
-            0.12, drone_height, 43.3, 640
-        )
-
-        error_sides = 320 - x
-        error_front = y - 320 - camera_displacement
-        self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
-
-        if x != -1:
-            kp = 1 / 100
+        if error_front != None:
+            kp = 0.5
             start_time = time.time()
+            self.get_logger().info(f"Moving drone with: x:{error_front*kp} | y:{error_sides*kp}")
             while time.time() - start_time < 0.2:
-                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
-        
+                #self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+                break
+            self.get_logger().info(f"Finished second adjust, landing...")
+
             self.drone.land()
 
             return True
@@ -432,10 +440,11 @@ def main(args=None) -> None:
         -45.44662,
         -22.4135038,
         -45.4465338,
-        -22.413543,
-        -45.4464616,
         -22.4136517,
-        -45.4465533
+        -45.4465533,
+        -22.413543,
+        -45.4464616
+        
         # -22.4152503,
         # -45.4479286,
         # -22.4153305,
