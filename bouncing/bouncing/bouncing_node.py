@@ -2,6 +2,7 @@ import rclpy
 import time
 import cv2
 import os
+from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
@@ -114,9 +115,9 @@ class BouncingNode(Node):
         ]
 
     def camera_cb(self, msg: Image):
-        bridge = cv2.CvBridge()
+        bridge = CvBridge()
         try:
-            self.latest_frame = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            self.last_frame = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as e:
             self.get_logger().error(f"Erro ao converter imagem: {e}")
 
@@ -132,6 +133,10 @@ class BouncingNode(Node):
         
         results = self.model(self.last_frame)[0]
         x1, y1, x2, y2 = -1, -1, -1, -1
+
+        if results.boxes is None or len(results.boxes) == 0:
+            return -1, -1, -1, -1
+
         for box in results.boxes:
             cls = int(box.cls.item())
             if cls == self.figure_class:
@@ -155,7 +160,7 @@ class BouncingNode(Node):
         time.sleep(8.0)
 
         #running first inference for pre-compiling the model
-        x1, y1, x2, y2 = self.camera.run_inference()
+        x1, y1, x2, y2 = self.run_inference()
 
         x = (x1 + x2) // 2
         y = (y1 + y2) // 2
@@ -174,7 +179,7 @@ class BouncingNode(Node):
             )
             
             self.get_logger().info(" --Running Inference--")
-            x1, y1, x2, y2 = self.camera.run_inference()
+            x1, y1, x2, y2 = self.run_inference()
 
             x = (x1 + x2) // 2
             y = (y1 + y2) // 2
@@ -205,17 +210,17 @@ class BouncingNode(Node):
             bool: True if the object was successfully re-identified and landed on, False otherwise.
         """
         camera_displacement = ImageCalculus.calculate_offset_pixels(
-            0.12, 6.5, 43.3, self.camera.model_output_size
+            0.12, 6.5, 43.3, self.model_output_size
         )
 
-        self.get_logger().info(f"drone center: {(self.camera.model_output_size / 2) + camera_displacement} | x:{coord_x} | y:{coord_y}")
+        self.get_logger().info(f"drone center: {(self.model_output_size / 2) + camera_displacement} | x:{coord_x} | y:{coord_y}")
 
         
         lat, lon = ImageCalculus.estimate_pixel_gps(
             origin_lat=self.drone.get_gps.latitude,
             origin_lon=self.drone.get_gps.longitude,
-            origin_row=(self.camera.model_output_size / 2) + camera_displacement,
-            origin_col=(self.camera.model_output_size / 2),
+            origin_row=(self.model_output_size / 2) + camera_displacement,
+            origin_col=(self.model_output_size / 2),
             target_row=coord_y,
             target_col=coord_x,
             gsd= 1.1 / 145,
@@ -233,7 +238,7 @@ class BouncingNode(Node):
         return self.adjust_position()
 
     def calculate_error(self) -> Tuple[float, float]:
-        x1, y1, x2, y2 = self.camera.run_inference()
+        x1, y1, x2, y2 = self.run_inference()
 
         error_front, error_sides = None, None
 
@@ -245,16 +250,16 @@ class BouncingNode(Node):
             
             gsd = self.figure_size / side_length
 
-            drone_height = (self.camera.model_output_size / 2) * gsd / np.tan(np.radians(43.3/2))
+            drone_height = (self.model_output_size / 2) * gsd / np.tan(np.radians(43.3/2))
 
             self.get_logger().info(f"drone height calculated pixel: {drone_height}")
 
             camera_displacement = ImageCalculus.calculate_offset_pixels(
-                0.12, drone_height, 43.3, self.camera.model_output_size
+                0.12, drone_height, 43.3, self.model_output_size
             )
 
-            error_sides = (self.camera.model_output_size / 2) - x
-            error_front = (self.camera.model_output_size / 2) + camera_displacement - y
+            error_sides = (self.model_output_size / 2) - x
+            error_front = (self.model_output_size / 2) + camera_displacement - y
             self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
 
         return gsd * error_front, gsd * error_sides
