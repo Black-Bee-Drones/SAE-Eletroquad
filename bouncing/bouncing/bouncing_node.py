@@ -79,6 +79,8 @@ class BouncingNode(Node):
         if self.figure_class is None:
             raise ValueError(f"Figura '{figure}' inválida. Opções válidas: {list(figure_map.keys())}")
 
+        self.brigde = CvBridge()
+
         self.image_height = 320
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "YOLOv11p.onnx")
         self.model = YOLO(model_path, task='detect')
@@ -115,9 +117,8 @@ class BouncingNode(Node):
         ]
 
     def camera_cb(self, msg: Image):
-        bridge = CvBridge()
         try:
-            self.last_frame = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            self.last_frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as e:
             self.get_logger().error(f"Erro ao converter imagem: {e}")
 
