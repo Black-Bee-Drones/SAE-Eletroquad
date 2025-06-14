@@ -60,19 +60,36 @@ CENTERING_CONFIRMATIONS = 28  # Consecutive low effort confirmations
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 300  # Timeout for descent in seconds
 
-# Distance estimation calibration
-# Old linear model constant (kept for reference)
-DISTANCE_CALIBRATION_CONST = 1476.0  # cm*px (24px at 61.5cm)
+# -- Distance estimation
+# linear model constant
+DISTANCE_CALIBRATION_CONST = 2150  # cm*px (21.5px at 100cm)
 
-# New polynomial model for distance estimation
-# Function: distance = a * height^2 + b * height + c
-# Fitted using new data measurements: 
-# [(100cm, 21.52px), (110cm, 20.32px), (120cm, 19.9px), (130cm, 19px), 
-#  (150cm, 18.1px), (90cm, 22.2px), (80cm, 24.4px), (70cm, 25.6px), (60cm, 28.2px)]
-# R² value: 0.9891
-DISTANCE_POLY_A = 0.7762820083195602
-DISTANCE_POLY_B = -44.25397825983744
-DISTANCE_POLY_C = 692.7037664674567
+# Exponential model parameters
+DISTANCE_EXP_A = 3869.716353
+DISTANCE_EXP_B = 0.201755
+DISTANCE_EXP_C = 48.252341
+
+# Polynomial
+DISTANCE_POLY_COEFFS = [
+    0.00885626433895872,
+    -0.9019966839116298,
+    34.69224987787756,
+    -602.3613120416837,
+    4085.0319538225926,
+]
+
+# Logarithmic (placeholder, not used)
+DISTANCE_LOG_A = 0.0
+DISTANCE_LOG_B = 0.0
+
+# Inverse Power (placeholder, not used)
+DISTANCE_K = 0.0
+DISTANCE_P = 0.0
+
+DISTANCE_ROBUST_A = 0.0
+DISTANCE_ROBUST_B = 0.0
+DISTANCE_ROBUST_C = 0.0
+
 
 TARGET_DISTANCE_CM = 20.0  # Target distance from hose in cm
 DISTANCE_TOLERANCE_CM = 2.0  # Tolerance for distance estimation
