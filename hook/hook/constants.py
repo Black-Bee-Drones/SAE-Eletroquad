@@ -60,8 +60,20 @@ CENTERING_CONFIRMATIONS = 28  # Consecutive low effort confirmations
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 300  # Timeout for descent in seconds
 
-# Distance estimation calibrationDESCEND_KP_Y
-DISTANCE_CALIBRATION_CONST = 21.42  # cm*px (21.6px at 100cm)
+# Distance estimation calibration
+# Old linear model constant (kept for reference)
+DISTANCE_CALIBRATION_CONST = 1476.0  # cm*px (24px at 61.5cm)
+
+# New polynomial model for distance estimation
+# Function: distance = a * height^2 + b * height + c
+# Fitted using new data measurements: 
+# [(100cm, 21.52px), (110cm, 20.32px), (120cm, 19.9px), (130cm, 19px), 
+#  (150cm, 18.1px), (90cm, 22.2px), (80cm, 24.4px), (70cm, 25.6px), (60cm, 28.2px)]
+# R² value: 0.9891
+DISTANCE_POLY_A = 0.7762820083195602
+DISTANCE_POLY_B = -44.25397825983744
+DISTANCE_POLY_C = 692.7037664674567
+
 TARGET_DISTANCE_CM = 20.0  # Target distance from hose in cm
 DISTANCE_TOLERANCE_CM = 2.0  # Tolerance for distance estimation
 
@@ -75,9 +87,3 @@ DESCEND_MAX_SPEED_XY = 0.20  # m/s
 HOCK_SERVO_CHANNEL = 3
 HOCK_RELEASE_PWM = 2000.0
 HOCK_HOLD_PWM = 1000.0
-
-Distância real (cm) --> Heighth Pixels
-100 --> 21.42
-51  --> 32
-45 --> 33
-161  --> 19.4
