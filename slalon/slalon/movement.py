@@ -128,7 +128,7 @@ class MovementStateMachine(Node):
                     return False
                 
                 self.get_logger().info("Moving drone to the left")
-                self.drone.offboard_velocity(0.0, 0.5, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, 0.3, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position += now - start
@@ -145,7 +145,7 @@ class MovementStateMachine(Node):
                     return False
                 
                 self.get_logger().info("Moving drone to the right")
-                self.drone.offboard_velocity(0.0, -0.5, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, -0.3, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position -= now - start
@@ -165,17 +165,17 @@ class MovementStateMachine(Node):
     def pass_by(self):
         if self.side == LEFT:
             self.get_logger().info("Moving drone to the left for 2 seconds")
-            self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=2.0)
+            self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=2)
             self.lateral_position += 2
             self.side = RIGHT
         else:
             self.get_logger().info("Moving drone to the right for 2 seconds")
-            self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=2.0)
+            self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=2)
             self.lateral_position -= 2
             self.side = LEFT
 
         self.get_logger().info("Moving foward for 3 seconds")
-        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=4)
+        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=5)
 
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
