@@ -9,5 +9,11 @@ def generate_launch_description():
             name='bouncing_node',
             output='screen'
         ),
+        Node(
+            package='bouncing',
+            executable='camera_node',
+            name='camera_node',
+            output='screen'
+        ),
     ])
 

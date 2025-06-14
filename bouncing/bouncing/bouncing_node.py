@@ -2,145 +2,14 @@ import rclpy
 import time
 import cv2
 import os
-import subprocess
-import re
+from sensor_msgs.msg import Image
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from typing import Tuple, List
 from mirela_sdk.control.mavros.mavros_api import MavDrone
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 import numpy as np
 from ultralytics import YOLO
-
-class CameraFeed():
-    """
-    Handles camera initialization, configuration, image capture, and inference using a YOLO model.
-    """
-
-    def __init__(self, target_class):
-        """
-        Initializes the camera feed, configures USB camera settings using v4l2-ctl,
-        and loads a YOLOv8 model for object detection.
-
-        Args:
-            target_class (int): The target class index to detect during inference.
-        """
-
-        self.target_class = target_class
-
-        self.photo_count = 0
-
-        C920_DEVICES = [
-            'HD Pro Webcam C920',
-            'Logi Webcam C920e',
-        ]
-        
-        result = subprocess.run(['v4l2-ctl', '--list-devices'], capture_output=True, text=True)
-        lines = result.stdout.splitlines()
-        self.device = None
-
-        for i, line in enumerate(lines):
-            for model_name in C920_DEVICES:
-                if model_name in line:
-                    j = i + 1
-                    while j < len(lines) and lines[j].startswith('\t'):
-                        match = re.search(r'(/dev/video\d+)', lines[j])
-                        if match:
-                            self.device = match.group(1)
-                            break
-                        j += 1
-                    break
-            if self.device:
-                break
-
-        if self.device is None:
-            raise RuntimeError("C920 camera not detected. Please ensure the device is connected and that 'v4l2-ctl' is installed.")
-        
-        self.exposure = 3
-
-        model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "YOLOv11p.onnx")
-        self.model_output_size = 320
-        self.model = YOLO(model_path, task='detect')
-
-
-    def take_photo(self) -> np.ndarray:
-        """
-        Captures a frame from the camera, crops it to a square (1:1), resizes to 640x640,
-        and saves the image to the local directory.
-
-        Returns:
-            np.ndarray: Processed image frame ready for inference.
-        """
-
-        output_path = "output.jpg"
-        image = None
-
-        try:
-            # 1. Configura a exposição
-            subprocess.run([
-                "/usr/bin/v4l2-ctl", "-d", self.device,
-                "-c", "focus_auto=0",
-                "-c", "exposure_auto=1",
-                "-c", f"exposure_absolute={self.exposure}"
-            ], check=True)
-
-            # 2. Captura uma imagem com ffmpeg
-            subprocess.run([
-            "/usr/bin/ffmpeg",
-            "-f", "video4linux2",
-            "-input_format", "mjpeg",
-            "-video_size", "1920x1080",
-            "-i", "/dev/video0",
-            "-frames:v", "1",
-            "output.jpg",
-            "-y",
-            "-loglevel", "quiet"
-        ], check=True)
-
-            # 3. Carrega a imagem no OpenCV
-            image = cv2.imread(output_path)
-            if image is None:
-                raise RuntimeError("Erro ao carregar a imagem.")
-
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Erro ao executar subprocesso: {e}")
-
-        # Cortar para 1:1 centralizado (quadrado)
-        side = 1080
-        center_x, center_y = 1920 // 2, 1080 // 2
-        half_side = side // 2
-        crop = image[center_y - half_side:center_y + half_side, center_x - half_side:center_x + half_side]
-
-        # Redimensionar para 640x640
-        resized = cv2.resize(crop, (self.model_output_size, self.model_output_size), interpolation=cv2.INTER_AREA)
-
-        filename = f"photo{self.photo_count}.jpg"
-        self.photo_count += 1
-        cv2.imwrite(filename, resized)
-        
-        return resized
-
-    
-    def run_inference(self) -> Tuple[int, int]:
-        """
-        Performs object detection using the YOLO model on the captured frame.
-
-        Returns:
-            Tuple[int, int]: Pixel coordinates (x, y) of the detected object center, or (-1, -1) if not found.
-        """
-        
-        frame = self.take_photo()
-        results = self.model(frame)[0]
-        x1, y1, x2, y2 = -1, -1, -1, -1
-        for box in results.boxes:
-            cls = int(box.cls.item())
-            if cls == self.target_class:
-                detected = True
-
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                break
-        return x1, y1, x2, y2
-
-
 
 
 class BouncingNode(Node):
@@ -167,6 +36,18 @@ class BouncingNode(Node):
         """
 
         super().__init__('bouncing_node')
+
+        # Configura QoS com apenas 1 imagem no buffer
+        qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
+        self.create_subscription(Image, 'camera/image_raw', self.camera_cb, qos_profile)
+
+        self.last_frame = None
+
 
         figure_map: dict[str, int] = {
             "circle": 0,
@@ -197,9 +78,10 @@ class BouncingNode(Node):
         if self.figure_class is None:
             raise ValueError(f"Figura '{figure}' inválida. Opções válidas: {list(figure_map.keys())}")
 
-
-        self.camera = CameraFeed(self.figure_class)
-
+        self.image_height = 320
+        model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "YOLOv11p.onnx")
+        self.model = YOLO(model_path, task='detect')
+        
         self.drone: MavDrone = MavDrone(self, False)
 
         self.corner_top_left: Tuple[float, float] = (p1_lat, p1_lon)     
@@ -230,6 +112,34 @@ class BouncingNode(Node):
             self.search_point_4a,
             self.search_point_4b
         ]
+
+    def camera_cb(self, msg: Image):
+        bridge = cv2.CvBridge()
+        try:
+            self.latest_frame = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except Exception as e:
+            self.get_logger().error(f"Erro ao converter imagem: {e}")
+
+    def run_inference(self) -> Tuple[int, int]:
+        """
+        Performs object detection using the YOLO model on the captured frame.
+
+        Returns:
+            Tuple[int, int]: Pixel coordinates (x, y) of the detected object center, or (-1, -1) if not found.
+        """
+
+        rclpy.spin_once(self)
+        
+        results = self.model(self.last_frame)[0]
+        x1, y1, x2, y2 = -1, -1, -1, -1
+        for box in results.boxes:
+            cls = int(box.cls.item())
+            if cls == self.figure_class:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                break
+
+        return x1, y1, x2, y2
+    
 
     def run(self) -> None:
         """
