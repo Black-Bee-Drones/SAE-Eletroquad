@@ -13,6 +13,14 @@ from hook.constants import (
     IMAGE_CENTER_X,
     IMAGE_CENTER_Y,
     LINE_DETECTION_RED_COLOR_NAME,
+    DISTANCE_CALIBRATION_CONST,
+    TARGET_DISTANCE_CM,
+    DISTANCE_TOLERANCE_CM,
+    DESCEND_KP_Z,
+    DESCEND_KP_Y,
+    DESCEND_KP_X,
+    DESCEND_MAX_SPEED_Z,
+    DESCEND_MAX_SPEED_XY,
 )
 from mirela_interfaces.msg import LineInfo
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
@@ -20,11 +28,11 @@ from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 
 class PerformDescent(State):
     """
-    Perform the descent operation based on the detected red hose's width,
+    Perform the descent operation based on the detected red hose's height,
     while actively centering the drone on it.
 
-    - Subscribes to line_info to get width, center_x, and center_y.
-    - Estimates distance to the hose using its width.
+    - Subscribes to line_info to get height, center_x, and center_y.
+    - Estimates distance to the hose using its height.
     - Uses P-controllers to command velocity (x, y, z) to descend
       to a target distance while staying centered.
     """
@@ -35,28 +43,15 @@ class PerformDescent(State):
         self.line_info_sub = None
 
         # Data from subscriber
-        self.hose_width = 0.0
+        self.hose_height = 0.0
         self.center_x = 0.0
         self.center_y = 0.0
         self.width_updates = 0
 
-        # --- Parameters ---
-        # Distance estimation
-        self.DISTANCE_CALIBRATION_CONST = 1534.25  # cm*px
-        self.TARGET_DISTANCE_CM = 20.0  # Target distance from hose
-        self.DISTANCE_TOLERANCE_CM = 3.0
-
-        # Centering PID
-        self.KP_Z = 0.01  # Proportional gain for descent speed
-        self.KP_Y = -0.003  # Proportional gain for lateral speed (linear_y)
-        self.KP_X = -0.003  # Proportional gain for forward speed (linear_x)
-        self.MAX_SPEED_Z = 0.25  # m/s
-        self.MAX_SPEED_XY = 0.20  # m/s
-
     def line_info_callback(self, msg: LineInfo):
         """Callback to update hose detection data."""
-        if msg.width > 0:
-            self.hose_width = msg.width
+        if msg.height > 0:
+            self.hose_height = msg.height
             self.center_x = msg.center_x
             self.center_y = msg.center_y
             self.width_updates += 1
@@ -89,12 +84,12 @@ class PerformDescent(State):
             # --- Main Control Logic ---
 
             # 1. Estimate current distance
-            current_dist_cm = self.DISTANCE_CALIBRATION_CONST / self.hose_width
+            current_dist_cm = DISTANCE_CALIBRATION_CONST / self.hose_height
             distance_m = current_dist_cm / 100.0
 
             # 2. Check for success condition
-            dist_error = current_dist_cm - self.TARGET_DISTANCE_CM
-            if abs(dist_error) <= self.DISTANCE_TOLERANCE_CM:
+            dist_error = current_dist_cm - TARGET_DISTANCE_CM
+            if abs(dist_error) <= DISTANCE_TOLERANCE_CM:
                 yasmin.YASMIN_LOG_INFO("Reached the target distance to the hose.")
                 mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 self.node.destroy_subscription(self.line_info_sub)
@@ -102,13 +97,13 @@ class PerformDescent(State):
 
             # 3. Calculate velocity commands
             # Z velocity (descent)
-            vz = -self.KP_Z * dist_error
-            vz = max(-self.MAX_SPEED_Z, min(self.MAX_SPEED_Z, vz))
+            vz = -DESCEND_KP_Z * dist_error
+            vz = max(-DESCEND_MAX_SPEED_Z, min(DESCEND_MAX_SPEED_Z, vz))
 
             # Y velocity (lateral centering)
             error_x = IMAGE_CENTER_X - self.center_x
-            vy = self.KP_Y * error_x
-            vy = max(-self.MAX_SPEED_XY, min(self.MAX_SPEED_XY, vy))
+            vy = DESCEND_KP_Y * error_x
+            vy = max(-DESCEND_MAX_SPEED_XY, min(DESCEND_MAX_SPEED_XY, vy))
 
             # X velocity (forward/backward centering with dynamic offset)
             offset_px = ImageCalculus.calculate_offset_pixels(
@@ -116,8 +111,8 @@ class PerformDescent(State):
             )
             setpoint_y = IMAGE_CENTER_Y + offset_px
             error_y = setpoint_y - self.center_y
-            vx = self.KP_X * error_y
-            vx = max(-self.MAX_SPEED_XY, min(self.MAX_SPEED_XY, vx))
+            vx = DESCEND_KP_X * error_y
+            vx = max(-DESCEND_MAX_SPEED_XY, min(DESCEND_MAX_SPEED_XY, vx))
 
             yasmin.YASMIN_LOG_INFO(
                 f"Dist: {current_dist_cm:.1f}cm, "

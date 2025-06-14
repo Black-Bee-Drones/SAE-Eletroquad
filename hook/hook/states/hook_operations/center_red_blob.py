@@ -30,6 +30,7 @@ from hook.constants import (
     LINE_DETECTION_SHOW_VISUALIZATION,
     LINE_DETECTION_RED_CENTERING_TITLE,
     TAKEOFF_ALTITUDE,
+    DISTANCE_CALIBRATION_CONST,
 )
 
 
@@ -88,13 +89,13 @@ class SetupRedLineStateRepublisher(State):
             f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
         )
         self.center_setpoint = IMAGE_CENTER_Y
-        self.distance_calibration_const = 1534.25  # cm*px
+        self.distance_calibration_const = DISTANCE_CALIBRATION_CONST  # cm*px
 
     def line_info_callback(self, msg: LineInfo):
         """Callback for LineInfo messages, republishes center_y and dynamic setpoint"""
-        if msg.width > 0:
+        if msg.height > 0:
             # Estimate distance in meters
-            distance_cm = self.distance_calibration_const / msg.width
+            distance_cm = self.distance_calibration_const / msg.height
             distance_m = distance_cm / 100.0
 
             # Calculate dynamic offset and setpoint
@@ -103,7 +104,7 @@ class SetupRedLineStateRepublisher(State):
             )
             self.center_setpoint = IMAGE_CENTER_Y + offset_px
             yasmin.YASMIN_LOG_INFO(
-                f"Hose width: {msg.width:.2f}px, "
+                f"Hose height: {msg.height:.2f}px, "
                 f"Est. distance: {distance_m:.2f}m, "
                 f"Setpoint: {self.center_setpoint:.2f}px"
             )
@@ -319,7 +320,7 @@ class CleanupProcesses(State):
         yasmin.YASMIN_LOG_INFO("Cleaning up centering processes...")
 
         ProcessUtils.kill_process(CENTERING_PID_PROCESS)
-        ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
+        # ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
         yasmin.YASMIN_LOG_INFO("Centering process cleanup completed")
         return SUCCEED

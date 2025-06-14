@@ -32,7 +32,7 @@ class HangTheHookSM(StateMachine):
         self.add_state(
             "TAKEOFF",
             Takeoff(),
-            transitions={SUCCEED: "SEARCH_BLUE_LINE", ABORT: "RETURN_TO_LAUNCH"},
+            transitions={SUCCEED: "CENTER_RED_BLOB", ABORT: "RETURN_TO_LAUNCH"},
         )
 
         self.add_state(
@@ -45,7 +45,7 @@ class HangTheHookSM(StateMachine):
             "FOLLOW_BLUE_LINE",
             FollowBlueLineWithRedDetection(),
             transitions={
-                SUCCEED: "CENTER_RED_BLOB",  
+                SUCCEED: "CENTER_RED_BLOB",
                 ABORT: "RETURN_TO_LAUNCH",
             },
         )
@@ -75,7 +75,7 @@ class HangTheHookSM(StateMachine):
             "RETURN_TO_LAUNCH",
             ReturnToLaunch(),
             transitions={SUCCEED: "END", ABORT: "END"},
-        )  
+        )
 
         self.add_state("END", End(), transitions={SUCCEED: SUCCEED})
 
