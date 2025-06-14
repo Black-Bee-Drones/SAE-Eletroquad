@@ -87,12 +87,27 @@ class SetupRedLineStateRepublisher(State):
         self.red_center_setpoint_topic = (
             f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
         )
-        self.center_setpoint = IMAGE_CENTER_Y + ImageCalculus.calculate_offset_pixels(
-            0.12, TAKEOFF_ALTITUDE, 43.3, 480
-        )
+        self.center_setpoint = IMAGE_CENTER_Y
+        self.distance_calibration_const = 1534.25  # cm*px
 
     def line_info_callback(self, msg: LineInfo):
-        """Callback for LineInfo messages, republishes center_y and setpoint"""
+        """Callback for LineInfo messages, republishes center_y and dynamic setpoint"""
+        if msg.width > 0:
+            # Estimate distance in meters
+            distance_cm = self.distance_calibration_const / msg.width
+            distance_m = distance_cm / 100.0
+
+            # Calculate dynamic offset and setpoint
+            offset_px = ImageCalculus.calculate_offset_pixels(
+                0.12, distance_m, 43.3, 480
+            )
+            self.center_setpoint = IMAGE_CENTER_Y + offset_px
+            yasmin.YASMIN_LOG_INFO(
+                f"Hose width: {msg.width:.2f}px, "
+                f"Est. distance: {distance_m:.2f}m, "
+                f"Setpoint: {self.center_setpoint:.2f}px"
+            )
+
         self.center_setpoint_pub.publish(Float64(data=self.center_setpoint))
         self.red_center_pub.publish(Float64(data=msg.center_y))
 
