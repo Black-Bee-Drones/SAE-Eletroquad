@@ -21,7 +21,7 @@ from hook.constants import (
     DESCEND_MAX_SPEED_Z,
     DESCEND_MAX_SPEED_XY,
 )
-from hook.utils.distance_estimation import estimate_distance_polynomial
+from hook.utils.distance_estimation import DistanceEstimator, EstimationMethod
 from mirela_interfaces.msg import LineInfo
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 
@@ -41,6 +41,9 @@ class PerformDescent(State):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
         self.line_info_sub = None
+        self.distance_estimator = DistanceEstimator(
+            default_method=EstimationMethod.EXPONENTIAL, validate_inputs=True
+        )
 
         # Data from subscriber
         self.hose_height = 0.0
@@ -83,8 +86,10 @@ class PerformDescent(State):
 
             # --- Main Control Logic ---
 
-            # 1. Estimate current distance using polynomial model
-            current_dist_cm = estimate_distance_polynomial(self.hose_height)
+            # 1. Estimate current distance using distance estimator
+            current_dist_cm = self.distance_estimator.estimate_distance(
+                self.hose_height
+            )
             distance_m = current_dist_cm / 100.0
 
             # 2. Check for success condition
