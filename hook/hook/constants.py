@@ -58,20 +58,26 @@ MIN_RED_COUNT_CONFIRMATIONS = 8  # Consecutive frames above threshold
 CENTERING_CONFIRMATIONS = 28  # Consecutive low effort confirmations
 
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
-DESCEND_TIMEOUT = 30  # Timeout for descent in seconds
+DESCEND_TIMEOUT = 300  # Timeout for descent in seconds
 
-# Distance estimation calibration
-DISTANCE_CALIBRATION_CONST = 1476.0  # cm*px (24px at 61.5cm)
+# Distance estimation calibrationDESCEND_KP_Y
+DISTANCE_CALIBRATION_CONST = 21.42  # cm*px (21.6px at 100cm)
 TARGET_DISTANCE_CM = 20.0  # Target distance from hose in cm
 DISTANCE_TOLERANCE_CM = 2.0  # Tolerance for distance estimation
 
 # Descend PID Parameters
-DESCEND_KP_Z = 0.01  # Proportional gain for descent speed
-DESCEND_KP_Y = -0.003  # Proportional gain for lateral speed
-DESCEND_KP_X = -0.003  # Proportional gain for forward speed
+DESCEND_KP_Z = 0.014  # Proportional gain for descent speed
+DESCEND_KP_Y = 0.0017  # Proportional gain for lateral speed
+DESCEND_KP_X = 0.0017  # Proportional gain for forward speed
 DESCEND_MAX_SPEED_Z = 0.25  # m/s
 DESCEND_MAX_SPEED_XY = 0.20  # m/s
 
 HOCK_SERVO_CHANNEL = 3
 HOCK_RELEASE_PWM = 2000.0
 HOCK_HOLD_PWM = 1000.0
+
+Distância real (cm) --> Heighth Pixels
+100 --> 21.42
+51  --> 32
+45 --> 33
+161  --> 19.4

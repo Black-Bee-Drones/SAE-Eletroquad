@@ -50,7 +50,7 @@ class PerformDescent(State):
 
     def line_info_callback(self, msg: LineInfo):
         """Callback to update hose detection data."""
-        if msg.height > 0:
+        if msg.height > 10.0:
             self.hose_height = msg.height
             self.center_x = msg.center_x
             self.center_y = msg.center_y
@@ -116,13 +116,12 @@ class PerformDescent(State):
 
             yasmin.YASMIN_LOG_INFO(
                 f"Dist: {current_dist_cm:.1f}cm, "
-                f"Errors(x,y): ({error_x:.1f}, {error_y:.1f})px, "
                 f"Vel(x,y,z): ({vx:.2f}, {vy:.2f}, {vz:.2f})m/s"
             )
 
             # 4. Send velocity command
             mavdrone.offboard_velocity(
-                linear_x=vx, linear_y=0.0, linear_z=vz, angular_z=0.0
+                linear_x=vx, linear_y=vy, linear_z=vz, angular_z=0.0
             )
 
             rclpy.spin_once(self.node)
