@@ -84,7 +84,7 @@ class BouncingNode(Node):
 
         self.bridge = CvBridge()
 
-        self.threshold = 100
+        self.threshold = 150
 
         self.image_height = 320
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "YOLOv11p.onnx")
@@ -402,7 +402,7 @@ class BouncingNode(Node):
         self.search_point_3b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 5/8)
         self.search_point_4b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 7/8)
 
-        lat, lon, lat1, lon1 = map(np.radians, [self.search_point_1a[0], self.search_point_1a[1], self.search_point_4a[0], self.search_point_4a[1]])
+        lat, lon, lat1, lon1 = map(np.radians, [self.search_point_4a[0], self.search_point_4a[1], self.search_point_1a[0], self.search_point_1a[1]])
 
         dlon = lon - lon1
 
@@ -419,23 +419,23 @@ def main(args=None) -> None:
     rclpy.init(args=args)
     node = BouncingNode(
         "house",
-        -22.4136107,
-        -45.44662,
-        -22.4135038,
-        -45.4465338,
-        -22.4136517,
-        -45.4465533,
-        -22.413543,
-        -45.4464616
+        # -22.4136107,
+        # -45.44662,
+        # -22.4135038,
+        # -45.4465338,
+        # -22.4136517,
+        # -45.4465533,
+        # -22.413543,
+        # -45.4464616
         
-        # -22.4152503,
-        # -45.4479286,
-        # -22.4153305,
-        # -45.4478092,
-        # -22.4153082,
-        # -45.4479674,
-        # -22.4153965,
-        # -45.4478671
+        -22.4152503,
+        -45.4479286,
+        -22.4153305,
+        -45.4478092,
+        -22.4153082,
+        -45.4479674,
+        -22.4153965,
+        -45.4478671
           )
     node.run()
     node.destroy_node()
