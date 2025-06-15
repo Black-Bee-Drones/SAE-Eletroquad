@@ -47,8 +47,8 @@ class CameraPublisher(Node):
             if self.device:
                 break
 
-        # if self.device is None:
-        #     raise RuntimeError("C920 camera not detected. Please ensure the device is connected and that 'v4l2-ctl' is installed.")
+        if self.device is None:
+            raise RuntimeError("C920 camera not detected. Please ensure the device is connected and that 'v4l2-ctl' is installed.")
         
 
         # Inicializa câmera
