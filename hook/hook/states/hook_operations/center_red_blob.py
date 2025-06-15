@@ -97,9 +97,7 @@ class SetupRedLineStateRepublisher(State):
         self.red_center_pub = None
         self.center_setpoint_pub = None
         self.should_continue = True
-        self.distance_estimator = DistanceEstimator(
-            default_method=EstimationMethod.EXPONENTIAL, validate_inputs=True
-        )
+        self.distance_estimator = DistanceEstimator()
 
         self.red_center_state_topic = (
             f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y"
@@ -118,7 +116,7 @@ class SetupRedLineStateRepublisher(State):
 
             # Calculate dynamic offset and setpoint
             offset_px = ImageCalculus.calculate_offset_pixels(
-                0.12, distance_m, 43.3, 480
+                0.09, distance_m, 43.3, 480
             )
             self.center_setpoint = IMAGE_CENTER_Y + offset_px
             yasmin.YASMIN_LOG_INFO(
@@ -178,9 +176,7 @@ class StartCenteringPID(State):
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
-        self.distance_estimator = DistanceEstimator(
-            default_method=EstimationMethod.EXPONENTIAL, validate_inputs=True
-        )
+        self.distance_estimator = DistanceEstimator()
 
         # Define topic names
         self.red_center_state_topic = (
@@ -203,7 +199,7 @@ class StartCenteringPID(State):
         # Publish initial setpoint
         center_msg = Float64()
         center_msg.data = IMAGE_CENTER_Y + ImageCalculus.calculate_offset_pixels(
-            0.12, TAKEOFF_ALTITUDE, 43.3, 480
+            0.09, TAKEOFF_ALTITUDE, 43.3, 480
         )
         center_setpoint_pub.publish(center_msg)
 
@@ -257,7 +253,7 @@ class PerformCentering(State):
 
         yasmin.YASMIN_LOG_INFO(f"Vel y: {self.current_y_velocity}")
 
-        if self.current_y_velocity <= 0.03:
+        if self.current_y_velocity <= 0.065:
             self.centering_confirmations += 1
             yasmin.YASMIN_LOG_INFO(
                 f"Confirmation center: {self.centering_confirmations}"

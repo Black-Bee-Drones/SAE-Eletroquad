@@ -48,24 +48,24 @@ ANGLE_D = 0.001
 ANGLE_OUTPUT_MIN = -0.65
 ANGLE_OUTPUT_MAX = 0.65
 
-CENTERING_P = 0.0015
+CENTERING_P = 0.0014
 CENTERING_I = 0.0
 CENTERING_D = 0.0001
 CENTERING_OUTPUT_MIN = -0.5
 CENTERING_OUTPUT_MAX = 0.5
 
 MIN_RED_COUNT_CONFIRMATIONS = 8  # Consecutive frames above threshold
-CENTERING_CONFIRMATIONS = 28  # Consecutive low effort confirmations
+CENTERING_CONFIRMATIONS = 14  # Consecutive low effort confirmations
 
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 300  # Timeout for descent in seconds
 
 # Descend PID Parameters
-DESCEND_KP_Z = 0.014  # Proportional gain for descent speed
-DESCEND_KP_Y = 0.0017  # Proportional gain for lateral speed
-DESCEND_KP_X = 0.0017  # Proportional gain for forward speed
-DESCEND_MAX_SPEED_Z = 0.25  # m/s
-DESCEND_MAX_SPEED_XY = 0.20  # m/s
+DESCEND_KP_Z = 0.012  # Proportional gain for descent speed
+DESCEND_KP_Y = 0.0052  # Proportional gain for lateral speed
+DESCEND_KP_X = 0.0052  # Proportional gain for forward speed
+DESCEND_MAX_SPEED_Z = 0.24  # m/s
+DESCEND_MAX_SPEED_XY = 0.15  # m/s
 
 HOCK_SERVO_CHANNEL = 3
 HOCK_RELEASE_PWM = 2000.0

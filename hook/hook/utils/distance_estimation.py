@@ -41,8 +41,8 @@ class DistanceEstimator:
 
     def __init__(
         self,
-        default_method: Union[EstimationMethod, str] = EstimationMethod.EXPONENTIAL,
-        validate_inputs: bool = True,
+        default_method: Union[EstimationMethod, str] = EstimationMethod.POLYNOMIAL,
+        validate_inputs: bool = False,
     ):
         """
         Initialize the distance estimator.

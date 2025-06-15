@@ -45,9 +45,7 @@ class PerformDescent(State):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
         self.line_info_sub = None
-        self.distance_estimator = DistanceEstimator(
-            default_method=EstimationMethod.EXPONENTIAL, validate_inputs=True
-        )
+        self.distance_estimator = DistanceEstimator()
 
         # Data from subscriber
         self.hose_height = 0.0
@@ -116,7 +114,7 @@ class PerformDescent(State):
 
             # X velocity (forward/backward centering with dynamic offset)
             offset_px = ImageCalculus.calculate_offset_pixels(
-                0.12, distance_m, 43.3, 480
+                0.09, distance_m, 43.3, 480
             )
             setpoint_y = IMAGE_CENTER_Y + offset_px
             error_y = setpoint_y - self.center_y
@@ -130,7 +128,7 @@ class PerformDescent(State):
 
             # 4. Send velocity command
             mavdrone.offboard_velocity(
-                linear_x=vx, linear_y=vy, linear_z=vz, angular_z=0.0
+                linear_x=vx, linear_y=0.0, linear_z=vz, angular_z=0.0
             )
 
             rclpy.spin_once(self.node)

@@ -66,7 +66,8 @@ class Takeoff(State):
 
         yasmin.YASMIN_LOG_INFO(f"Attempting takeoff to {TAKEOFF_ALTITUDE}m...")
         try:
-            # self.mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
+            self.mavdrone.set_home(current_gps=True)
+            self.mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
 
             time.sleep(3)
 
@@ -75,7 +76,7 @@ class Takeoff(State):
             while time.time() - start_time < timeout:
                 rclpy.spin_once(self.node)
 
-                alt = TAKEOFF_ALTITUDE  # self.mavdrone.get_rel_alt.data
+                alt = self.mavdrone.get_rel_alt.data
                 yasmin.YASMIN_LOG_INFO(f"Current altitude: {alt:.2f}m")
 
                 diff = abs(alt) - TAKEOFF_ALTITUDE
