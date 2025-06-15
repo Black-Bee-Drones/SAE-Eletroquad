@@ -13,15 +13,19 @@ from hook.constants import (
     IMAGE_CENTER_X,
     IMAGE_CENTER_Y,
     LINE_DETECTION_RED_COLOR_NAME,
-    DISTANCE_CALIBRATION_CONST,
-    TARGET_DISTANCE_CM,
-    DISTANCE_TOLERANCE_CM,
     DESCEND_KP_Z,
     DESCEND_KP_Y,
     DESCEND_KP_X,
     DESCEND_MAX_SPEED_Z,
     DESCEND_MAX_SPEED_XY,
 )
+from hook.utils.distance_parameters import (
+    DISTANCE_CALIBRATION_CONST,
+    TARGET_DISTANCE_CM,
+    DISTANCE_TOLERANCE_CM,
+)
+from hook.utils.distance_estimation import DistanceEstimator, EstimationMethod
+from mirela_interfaces.msg import LineInfo
 from mirela_interfaces.msg import LineInfo
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 
@@ -41,6 +45,9 @@ class PerformDescent(State):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
         self.line_info_sub = None
+        self.distance_estimator = DistanceEstimator(
+            default_method=EstimationMethod.EXPONENTIAL, validate_inputs=True
+        )
 
         # Data from subscriber
         self.hose_height = 0.0
@@ -83,8 +90,10 @@ class PerformDescent(State):
 
             # --- Main Control Logic ---
 
-            # 1. Estimate current distance
-            current_dist_cm = DISTANCE_CALIBRATION_CONST / self.hose_height
+            # 1. Estimate current distance using distance estimator
+            current_dist_cm = self.distance_estimator.estimate_distance(
+                self.hose_height
+            )
             distance_m = current_dist_cm / 100.0
 
             # 2. Check for success condition

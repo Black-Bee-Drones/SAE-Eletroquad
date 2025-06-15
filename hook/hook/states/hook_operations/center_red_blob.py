@@ -9,7 +9,6 @@ from mirela_sdk.utils.process import ProcessUtils
 from mirela_interfaces.msg import LineInfo
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 from std_msgs.msg import Float64
-
 from time import sleep
 import time
 
@@ -30,8 +29,9 @@ from hook.constants import (
     LINE_DETECTION_SHOW_VISUALIZATION,
     LINE_DETECTION_RED_CENTERING_TITLE,
     TAKEOFF_ALTITUDE,
-    DISTANCE_CALIBRATION_CONST,
 )
+from hook.utils.distance_parameters import DISTANCE_CALIBRATION_CONST
+from hook.utils.distance_estimation import DistanceEstimator, EstimationMethod
 
 
 class StartRedLineDetection(State):
@@ -89,13 +89,31 @@ class SetupRedLineStateRepublisher(State):
             f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
         )
         self.center_setpoint = IMAGE_CENTER_Y
-        self.distance_calibration_const = DISTANCE_CALIBRATION_CONST  # cm*px
+
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+        self.node = YasminNode.get_instance()
+        self.red_line_info_sub = None
+        self.red_center_pub = None
+        self.center_setpoint_pub = None
+        self.should_continue = True
+        self.distance_estimator = DistanceEstimator(
+            default_method=EstimationMethod.EXPONENTIAL, validate_inputs=True
+        )
+
+        self.red_center_state_topic = (
+            f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y"
+        )
+        self.red_center_setpoint_topic = (
+            f"/{LINE_DETECTION_RED_COLOR_NAME}/center_setpoint"
+        )
+        self.center_setpoint = IMAGE_CENTER_Y
 
     def line_info_callback(self, msg: LineInfo):
         """Callback for LineInfo messages, republishes center_y and dynamic setpoint"""
         if msg.height > 0:
-            # Estimate distance in meters
-            distance_cm = self.distance_calibration_const / msg.height
+            # Estimate distance in meters using the distance estimator
+            distance_cm = self.distance_estimator.estimate_distance(msg.height)
             distance_m = distance_cm / 100.0
 
             # Calculate dynamic offset and setpoint
@@ -160,8 +178,11 @@ class StartCenteringPID(State):
     def __init__(self):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
+        self.distance_estimator = DistanceEstimator(
+            default_method=EstimationMethod.EXPONENTIAL, validate_inputs=True
+        )
 
-        # Define topic namesSAE-Eletroquad
+        # Define topic names
         self.red_center_state_topic = (
             f"/line_state/{LINE_DETECTION_RED_COLOR_NAME}/center_y"
         )
