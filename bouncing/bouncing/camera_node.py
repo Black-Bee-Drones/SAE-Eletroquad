@@ -47,12 +47,12 @@ class CameraPublisher(Node):
             if self.device:
                 break
 
-        if self.device is None:
-            raise RuntimeError("C920 camera not detected. Please ensure the device is connected and that 'v4l2-ctl' is installed.")
+        # if self.device is None:
+        #     raise RuntimeError("C920 camera not detected. Please ensure the device is connected and that 'v4l2-ctl' is installed.")
         
 
         # Inicializa câmera
-        self.cap = cv2.VideoCapture(self.device)  # /dev/video0
+        self.cap = cv2.VideoCapture(self.device)
         if not self.cap.isOpened():
             self.get_logger().error("Não foi possível abrir a câmera.")
             exit(1)
@@ -72,11 +72,11 @@ class CameraPublisher(Node):
         subprocess.run([
             '/usr/bin/v4l2-ctl',
             '-d', self.device,
-            '-c', 'exposure_time_absolute=50'
+            '-c', 'exposure_time_absolute=120'
         ], check=True)
 
         # Timer para capturar imagens a 10 Hz
-        self.timer = self.create_timer(0.01, self.timer_callback)
+        self.timer = self.create_timer(0.1, self.timer_callback)
 
     def timer_callback(self):
         ret, frame = self.cap.read()

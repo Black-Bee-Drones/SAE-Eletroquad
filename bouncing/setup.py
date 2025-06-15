@@ -24,7 +24,8 @@ setup(
     entry_points={
         'console_scripts': [
             'bouncing_node = bouncing.bouncing_node:main',
-            'camera_node = bouncing.camera_node:main'
+            'camera_node = bouncing.camera_node:main',
+            'calibration_node = bouncing.calibrate:main'
         ],
     },
 )

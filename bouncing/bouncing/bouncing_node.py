@@ -15,9 +15,10 @@ from ultralytics import YOLO
 
 class BouncingNode(Node):
     """
-    ROS 2 node that manages the drone search routine over a mapped area using GPS navigation
-    and computer vision to detect specific objects in real-time.
+    ROS 2 node that manages a drone's search and detection routine within a predefined GPS area.
+    It uses YOLO-based object detection on real-time camera feeds and navigates based on detection results.
     """
+
 
     def __init__(
             self, 
@@ -29,12 +30,14 @@ class BouncingNode(Node):
         ) -> None:
 
         """
-        Initializes the drone node, loads the target figure class, camera, and map coordinates.
+        Initializes the BouncingNode with the specified target figure and GPS area corners.
 
         Args:
-            figure (str): Name of the figure class to detect (e.g., "circle").
-            p1_lat, p1_lon ... p4_lat, p4_lon: GPS coordinates defining the corners of the search area.
+            figure (str): Name of the target figure to detect (e.g., "circle").
+            p1_lat, p1_lon, ..., p4_lat, p4_lon (float): GPS coordinates of the rectangular search area corners, 
+                ordered as top-left, top-right, bottom-left, bottom-right.
         """
+
 
         super().__init__('bouncing_node')
 
@@ -79,7 +82,9 @@ class BouncingNode(Node):
         if self.figure_class is None:
             raise ValueError(f"Figura '{figure}' inválida. Opções válidas: {list(figure_map.keys())}")
 
-        self.brigde = CvBridge()
+        self.bridge = CvBridge()
+
+        self.threshold = 100
 
         self.image_height = 320
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "YOLOv11p.onnx")
@@ -117,6 +122,13 @@ class BouncingNode(Node):
         ]
 
     def camera_cb(self, msg: Image):
+        """
+        ROS callback that receives and stores the latest camera frame.
+
+        Args:
+            msg (Image): ROS image message containing the camera frame.
+        """
+
         try:
             self.last_frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as e:
@@ -124,13 +136,16 @@ class BouncingNode(Node):
 
     def run_inference(self) -> Tuple[int, int]:
         """
-        Performs object detection using the YOLO model on the captured frame.
+        Runs YOLO object detection on the latest camera frame.
 
         Returns:
-            Tuple[int, int]: Pixel coordinates (x, y) of the detected object center, or (-1, -1) if not found.
+            Tuple[int, int]: Coordinates (x1, y1, x2, y2) of the bounding box if the target is detected;
+                            (-1, -1, -1, -1) if not found.
         """
 
-        rclpy.spin_once(self)
+        rclpy.spin_once(self, timeout_sec=0.2)
+
+        cv2.imwrite("inference.jpg", self.last_frame)
         
         results = self.model(self.last_frame)[0]
         x1, y1, x2, y2 = -1, -1, -1, -1
@@ -144,16 +159,19 @@ class BouncingNode(Node):
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 break
 
+        if x1 > 0:
+            self.get_logger().info("Detected!")
+
         return x1, y1, x2, y2
     
 
     def run(self) -> None:
         """
-        Executes the full search routine:
-        - Takes off
-        - Visits each precomputed point
-        - Runs detection
-        - If the object is detected, navigates toward it and attempts to land.
+        Performs the complete mission routine:
+        - Takes off.
+        - Visits predefined GPS waypoints.
+        - Runs inference on each location.
+        - If the target is detected, attempts to navigate and land on it.
         """
 
         self.drone.arm_takeoff(6.5)
@@ -184,10 +202,9 @@ class BouncingNode(Node):
 
             x = (x1 + x2) // 2
             y = (y1 + y2) // 2
-            rclpy.spin_once(self)
+            rclpy.spin_once(self, timeout_sec=0.2)
 
             if x != -1:
-                self.get_logger().info("Detected!")
                 if self.visit_detection(x, y): break
 
             self.points_to_visit.pop(0)
@@ -200,28 +217,29 @@ class BouncingNode(Node):
         
     def visit_detection(self, coord_x: int, coord_y: int) -> bool:
         """
-        Converts the pixel coordinates of the detection into GPS coordinates,
-        then navigates the drone to the target location.
+        Converts the pixel coordinates of a detected object into estimated GPS coordinates,
+        then navigates the drone to that location for validation.
 
         Args:
-            coord_x (int): X pixel coordinate of the detection.
-            coord_y (int): Y pixel coordinate of the detection.
+            coord_x (int): X pixel coordinate of the detected object.
+            coord_y (int): Y pixel coordinate of the detected object.
 
         Returns:
-            bool: True if the object was successfully re-identified and landed on, False otherwise.
+            bool: True if the object was successfully validated and landing was initiated; False otherwise.
         """
+
         camera_displacement = ImageCalculus.calculate_offset_pixels(
-            0.12, 6.5, 43.3, self.model_output_size
+            0.12, 6.5, 43.3, self.image_height
         )
 
-        self.get_logger().info(f"drone center: {(self.model_output_size / 2) + camera_displacement} | x:{coord_x} | y:{coord_y}")
+        self.get_logger().info(f"drone center: {(self.image_height / 2) + camera_displacement} | x:{coord_x} | y:{coord_y}")
 
         
         lat, lon = ImageCalculus.estimate_pixel_gps(
             origin_lat=self.drone.get_gps.latitude,
             origin_lon=self.drone.get_gps.longitude,
-            origin_row=(self.model_output_size / 2) + camera_displacement,
-            origin_col=(self.model_output_size / 2),
+            origin_row=(self.image_height / 2) + camera_displacement,
+            origin_col=(self.image_height / 2),
             target_row=coord_y,
             target_col=coord_x,
             gsd= 1.1 / 145,
@@ -239,61 +257,108 @@ class BouncingNode(Node):
         return self.adjust_position()
 
     def calculate_error(self) -> Tuple[float, float]:
+        """
+        Analyzes the bounding box of the detected object and computes positional errors
+        (front and side) based on the drone's image center and the object’s estimated size.
+
+        Returns:
+            Tuple[float, float]: Positional errors in meters (front, side) from the target.
+        """
+
         x1, y1, x2, y2 = self.run_inference()
 
-        error_front, error_sides = None, None
+        gsd = 0
 
         if x1 >= 0:
+
             x = (x1 + x2) // 2
             y = (y1 + y2) // 2
 
-            side_length = max(x2 - x1, y2 - y1)
-            
+            crop = self.last_frame[int(y1):int(y2), int(x1):int(x2)]
+            lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB)
+            l_channel, _, _ = cv2.split(lab)
+            _, thresh = cv2.threshold(l_channel, self.threshold, 255, cv2.THRESH_BINARY_INV)
+
+            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            cnt = max(contours, key=cv2.contourArea)
+
+            rect = cv2.minAreaRect(cnt)
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+
+            width, height = rect[1]
+            side_length = max(width, height)
+
             gsd = self.figure_size / side_length
 
-            drone_height = (self.model_output_size / 2) * gsd / np.tan(np.radians(43.3/2))
+            drone_height = (self.image_height / 2) * gsd / np.tan(np.radians(43.3/2))
 
             self.get_logger().info(f"drone height calculated pixel: {drone_height}")
 
             camera_displacement = ImageCalculus.calculate_offset_pixels(
-                0.12, drone_height, 43.3, self.model_output_size
+                0.12, drone_height, 43.3, self.image_height
             )
 
-            error_sides = (self.model_output_size / 2) - x
-            error_front = (self.model_output_size / 2) + camera_displacement - y
-            self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
+            self.get_logger().info(f"cam_dis: {camera_displacement * gsd}")
+
+            error_sides = (self.image_height / 2) - x
+            error_front = (self.image_height / 2) + camera_displacement - y
+            self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front*gsd}m | ERROR SIDES: {error_sides*gsd}m")
+
+            cv2.drawContours(self.last_frame, [box], 0, (255, 0, 0), 2)
+
+            # Desenha ponto da inferência (azul)
+            cv2.circle(self.last_frame, (int(x), int(y)), 5, (255, 0, 0), -1)
+
+            # Desenha ponto do centro do drone (verde)
+            center_x = (self.image_height // 2)
+            center_y = (self.image_height // 2) + int(camera_displacement)
+            cv2.circle(self.last_frame, (center_x, center_y), 5, (0, 255, 0), -1)
+
+            # Desenha ponto do centro do drone (verde)
+            center_x = (self.image_height // 2)
+            center_y = (self.image_height // 2)
+            cv2.circle(self.last_frame, (center_x, center_y), 5, (255, 0, 0), -1)   
+
+            # Salva a imagem
+            cv2.imwrite("contorno.jpg", self.last_frame)
 
         return gsd * error_front, gsd * error_sides
 
 
     def adjust_position(self) -> bool:
         """
-        Performs a final detection and velocity adjustment toward the target.
-        If detection is still valid, lands the drone.
+        Performs fine position adjustment using calculated error, then attempts a second correction.
+        Initiates landing if the object remains in view.
 
         Returns:
-            bool: True if target still detected and drone lands, False otherwise.
+            bool: True if landing was initiated after adjustments; False otherwise.
         """
+
 
         error_front, error_sides = self.calculate_error()
         if error_front != None:
             kp = 0.5
             start_time = time.time()
             self.get_logger().info(f"Moving drone with: x:{error_front*kp} | y:{error_sides*kp}")
-            while time.time() - start_time < 0.2:
-                #self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
-                break
+            while time.time() - start_time < 0.5:
+                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+
             self.get_logger().info(f"Finished first adjust")
 
-            self.drone.land()
-
-            return True
-
-            #return self.adjust_and_land()
+            return self.adjust_and_land()
         else:
             return False
 
     def adjust_and_land(self):
+        """
+        Performs a second fine adjustment based on updated inference data.
+        If successful, lands the drone.
+
+        Returns:
+            bool: True if drone landed successfully; False otherwise.
+        """
 
         error_front, error_sides = self.calculate_error()
 
@@ -301,9 +366,9 @@ class BouncingNode(Node):
             kp = 0.5
             start_time = time.time()
             self.get_logger().info(f"Moving drone with: x:{error_front*kp} | y:{error_sides*kp}")
-            while time.time() - start_time < 0.2:
-                #self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
-                break
+            while time.time() - start_time < 0.5:
+                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+
             self.get_logger().info(f"Finished second adjust, landing...")
 
             self.drone.land()
@@ -314,9 +379,12 @@ class BouncingNode(Node):
 
     def points_calculation(self) -> None:
         """
-        Computes 8 intermediate GPS points within the search area based on the input corners.
-        The search points are evenly distributed along horizontal bands across the area.
+        Calculates 8 internal GPS waypoints evenly spaced across the defined rectangular area.
+        These points are used during the search routine.
+
+        Also computes the camera heading angle for consistent orientation during image capture.
         """
+
 
         upper_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 1/4)
         lower_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 3/4)
