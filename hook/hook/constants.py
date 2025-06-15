@@ -60,40 +60,6 @@ CENTERING_CONFIRMATIONS = 28  # Consecutive low effort confirmations
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
 DESCEND_TIMEOUT = 300  # Timeout for descent in seconds
 
-# -- Distance estimation
-# linear model constant
-DISTANCE_CALIBRATION_CONST = 2150  # cm*px (21.5px at 100cm)
-
-# Exponential model parameters
-DISTANCE_EXP_A = 3869.716353
-DISTANCE_EXP_B = 0.201755
-DISTANCE_EXP_C = 48.252341
-
-# Polynomial
-DISTANCE_POLY_COEFFS = [
-    0.00885626433895872,
-    -0.9019966839116298,
-    34.69224987787756,
-    -602.3613120416837,
-    4085.0319538225926,
-]
-
-# Logarithmic (placeholder, not used)
-DISTANCE_LOG_A = 0.0
-DISTANCE_LOG_B = 0.0
-
-# Inverse Power (placeholder, not used)
-DISTANCE_K = 0.0
-DISTANCE_P = 0.0
-
-DISTANCE_ROBUST_A = 0.0
-DISTANCE_ROBUST_B = 0.0
-DISTANCE_ROBUST_C = 0.0
-
-
-TARGET_DISTANCE_CM = 20.0  # Target distance from hose in cm
-DISTANCE_TOLERANCE_CM = 2.0  # Tolerance for distance estimation
-
 # Descend PID Parameters
 DESCEND_KP_Z = 0.014  # Proportional gain for descent speed
 DESCEND_KP_Y = 0.0017  # Proportional gain for lateral speed

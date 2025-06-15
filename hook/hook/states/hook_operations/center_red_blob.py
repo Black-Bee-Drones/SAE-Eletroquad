@@ -30,6 +30,7 @@ from hook.constants import (
     LINE_DETECTION_RED_CENTERING_TITLE,
     TAKEOFF_ALTITUDE,
 )
+from hook.utils.distance_parameters import DISTANCE_CALIBRATION_CONST
 from hook.utils.distance_estimation import DistanceEstimator, EstimationMethod
 
 

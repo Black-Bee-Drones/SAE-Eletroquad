@@ -2,7 +2,7 @@ import numpy as np
 from enum import Enum
 from typing import Union, Optional, Dict, Any
 import logging
-from hook.constants import (
+from hook.utils.distance_parameters import (
     DISTANCE_POLY_COEFFS,
     DISTANCE_CALIBRATION_CONST,
     DISTANCE_EXP_A,
@@ -15,6 +15,8 @@ from hook.constants import (
     DISTANCE_ROBUST_A,
     DISTANCE_ROBUST_B,
     DISTANCE_ROBUST_C,
+    TARGET_DISTANCE_CM,
+    DISTANCE_TOLERANCE_CM,
 )
 
 

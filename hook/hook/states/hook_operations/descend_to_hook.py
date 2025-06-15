@@ -13,15 +13,19 @@ from hook.constants import (
     IMAGE_CENTER_X,
     IMAGE_CENTER_Y,
     LINE_DETECTION_RED_COLOR_NAME,
-    TARGET_DISTANCE_CM,
-    DISTANCE_TOLERANCE_CM,
     DESCEND_KP_Z,
     DESCEND_KP_Y,
     DESCEND_KP_X,
     DESCEND_MAX_SPEED_Z,
     DESCEND_MAX_SPEED_XY,
 )
+from hook.utils.distance_parameters import (
+    DISTANCE_CALIBRATION_CONST,
+    TARGET_DISTANCE_CM,
+    DISTANCE_TOLERANCE_CM,
+)
 from hook.utils.distance_estimation import DistanceEstimator, EstimationMethod
+from mirela_interfaces.msg import LineInfo
 from mirela_interfaces.msg import LineInfo
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 
