@@ -100,6 +100,7 @@ class PerformDescent(State):
                 yasmin.YASMIN_LOG_INFO("Reached the target distance to the hose.")
                 mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 self.node.destroy_subscription(self.line_info_sub)
+                mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 return SUCCEED
 
             # 3. Calculate velocity commands
@@ -114,7 +115,7 @@ class PerformDescent(State):
 
             # X velocity (forward/backward centering with dynamic offset)
             offset_px = ImageCalculus.calculate_offset_pixels(
-                0.09, distance_m, 43.3, 480
+                0.089, distance_m, 43.3, 480
             )
             setpoint_y = IMAGE_CENTER_Y + offset_px
             error_y = setpoint_y - self.center_y

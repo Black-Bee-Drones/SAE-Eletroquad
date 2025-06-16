@@ -116,7 +116,7 @@ class SetupRedLineStateRepublisher(State):
 
             # Calculate dynamic offset and setpoint
             offset_px = ImageCalculus.calculate_offset_pixels(
-                0.09, distance_m, 43.3, 480
+                0.089, distance_m, 43.3, 480
             )
             self.center_setpoint = IMAGE_CENTER_Y + offset_px
             yasmin.YASMIN_LOG_INFO(
@@ -199,7 +199,7 @@ class StartCenteringPID(State):
         # Publish initial setpoint
         center_msg = Float64()
         center_msg.data = IMAGE_CENTER_Y + ImageCalculus.calculate_offset_pixels(
-            0.09, TAKEOFF_ALTITUDE, 43.3, 480
+            0.089, TAKEOFF_ALTITUDE, 43.3, 480
         )
         center_setpoint_pub.publish(center_msg)
 
@@ -309,6 +309,8 @@ class PerformCentering(State):
                 return SUCCEED
 
         yasmin.YASMIN_LOG_ERROR("Failed to center on red blob (timeout).")
+        for node, sub in blackboard["subscribers_to_clean"]:
+            self.node.destroy_subscription(sub)
         self._cleanup_subscribers()
         return ABORT
 
