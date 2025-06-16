@@ -5,7 +5,7 @@ import numpy as np
 from std_msgs.msg import Float32
 from std_msgs.msg import Int8
 from itertools import groupby
-from mirela_sdk.image_processing.color import ColorDetector
+from mirela_sdk.image_processing.color import ColorSpace, ColorDetector
 
 #Movimentação do drone conforme as cores
 #Altura max do drone é de 2.5 metros
@@ -22,6 +22,7 @@ class DepthMeasurement(Node):
         self.find_pub = self.create_publisher(Int8, "where_is_it", 10)
 
         self.detector = ColorDetector("preset", "blue_sl")
+        self.lab_detector = ColorDetector("preset", "blue_lb", ColorSpace.LAB)
 
         self.declare_parameter("cap", 0)
         cap_param = self.get_parameter("cap").value
@@ -41,13 +42,17 @@ class DepthMeasurement(Node):
         ret, frame = self.cap.read()
 
         self.detector.filterColor(frame)
+        self.lab_detector.filterColor(frame)
         
+        mask = cv2.bitwise_and(self.detector.mask, self.lab_detector.mask)
+
+        mask = cv2.dilate(mask, np.ones((20, 20), np.int8), iterations=2)
 
         # Calcular quantos pixels brancos existem em cada coluna
-        col_sums = np.count_nonzero(self.detector.mask, axis=0)  # shape: (640,)
+        col_sums = np.count_nonzero(mask, axis=0)  # shape: (640,)
 
         # Criar máscara booleana das colunas que passam do limite (60% da altura = 288)
-        valid_cols = col_sums > 200
+        valid_cols = col_sums > 288
 
 
         indices = np.where(valid_cols)[0]
@@ -56,7 +61,7 @@ class DepthMeasurement(Node):
         # Encontrar o maior grupo contínuo (maior faixa de colunas válidas)
         longest_group = max(groups, key=len, default=[])
 
-        pipe_area = np.zeros_like(self.detector.mask)
+        pipe_area = np.zeros_like(mask)
 
         if 69 > len(longest_group) > 15:
             begin = longest_group[0][1]
@@ -67,18 +72,19 @@ class DepthMeasurement(Node):
 
 
         #Matriz do tamanho da mascara preenchida com zeros
-        roi = np.zeros_like(self.detector.mask)
+        roi = np.zeros_like(mask)
 
         #Define uma linha no centro dessa matriz com valor 255, que será a área de detecção
-        roi[240:241,:] = 255
+        roi[230:250,:] = 255
 
-        pixels_in_roi = cv2.bitwise_and(self.detector.mask, roi)
+        pixels_in_roi = cv2.bitwise_and(mask, roi)
 
         #pixels_in_roi = cv2.cvtColor(pixels_in_roi, cv2.COLOR_BGR2GRAY)
 
         self.pipe_in_roi = cv2.bitwise_and(pipe_area, roi)
 
-        pixels_nonzero = np.count_nonzero(pixels_in_roi)
+
+        pixels_nonzero = np.count_nonzero(pixels_in_roi)/20
 
 
         #Regra de 3 para calcular a distancia baseado na variação do número de pixels

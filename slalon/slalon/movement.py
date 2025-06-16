@@ -42,6 +42,7 @@ class MovementStateMachine(Node):
 
     def distance_callback(self, msg):
         self.distance_to_object = msg.data
+        self.get_logger().info(f'DISTANCE{self.distance_to_object}')
         if self.distance_to_object < 250:
             self.too_close = True
         else:
@@ -123,12 +124,12 @@ class MovementStateMachine(Node):
 
             #Moves drone until it centralizes or for max of 6 seconds
             while self.object_location != CENTER:
-                if now - start > 6:
+                if now - start > 8:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
                 self.get_logger().info("Moving drone to the left")
-                self.drone.offboard_velocity(0.0, 0.3, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, 0.4, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position += now - start
@@ -140,12 +141,12 @@ class MovementStateMachine(Node):
 
             #Moves drone until it centralizes or for max of 6 seconds
             while self.object_location != CENTER:
-                if now - start > 6:
+                if now - start > 8:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
                 self.get_logger().info("Moving drone to the right")
-                self.drone.offboard_velocity(0.0, -0.3, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, -0.4, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position -= now - start

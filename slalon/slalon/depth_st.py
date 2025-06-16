@@ -6,6 +6,7 @@ import cv2
 from std_msgs.msg import Float32
 from slalon.depth_measurement import DepthMeasurement
 from mirela_sdk.image_processing.color import ColorDetector
+from mirela_sdk.image_processing.color import ColorSpace
 
 #Movimentação do drone conforme as cores
 #Altura max do drone é de 2.5 metros
@@ -35,6 +36,10 @@ class DepthStateMachine(DepthMeasurement):
         self.black_detector = ColorDetector("preset", "black_sl")
         self.pink_detector = ColorDetector("preset", "pink_sl")
 
+        self.red_lab = ColorDetector("preset", "red_lb", ColorSpace.LAB)
+        self.blue_lab = ColorDetector("preset", "blue_lb", ColorSpace.LAB)
+        self.pink_lab = ColorDetector("preset", "pink_lb", ColorSpace.LAB)
+        self.black_lab = ColorDetector("preset", "black_lb", ColorSpace.LAB)
 
         self.cont = 0
         
