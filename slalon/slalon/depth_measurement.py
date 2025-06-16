@@ -35,7 +35,7 @@ class DepthMeasurement(Node):
         self.width = 0
 
         #Numero de pixels filtrado vezes a distancia da camera à esse numero de pixels
-        self.const: float = 69*100 
+        self.const: float = 75*100 
 
         
     def depth_callback(self):
@@ -63,7 +63,7 @@ class DepthMeasurement(Node):
 
         pipe_area = np.zeros_like(mask)
 
-        if 69 > len(longest_group) > 15:
+        if 80 > len(longest_group) > 18:
             begin = longest_group[0][1]
             end = longest_group[-1][1]
             self.width = longest_group[-1][0] + 1
