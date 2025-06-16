@@ -44,9 +44,7 @@ class DepthMeasurement(Node):
         self.detector.filterColor(frame)
         self.lab_detector.filterColor(frame)
         
-        mask = cv2.bitwise_and(self.detector.mask, self.lab_detector.mask)
-
-        mask = cv2.dilate(mask, np.ones((20, 20), np.int8), iterations=2)
+        mask = cv2.bitwise_or(self.detector.mask, self.lab_detector.mask)
 
         # Calcular quantos pixels brancos existem em cada coluna
         col_sums = np.count_nonzero(mask, axis=0)  # shape: (640,)
@@ -121,7 +119,7 @@ class DepthMeasurement(Node):
         if not left and not right:
             msg.data = 0
             self.find_pub.publish(msg) #nenhum objeto encontrado
-        elif abs(left - right) <= 10:
+        elif abs(left - right) <= 50:
             msg.data = 1
             self.find_pub.publish(msg) #ta no centro
         elif left > right:
@@ -130,3 +128,4 @@ class DepthMeasurement(Node):
         else:
             msg.data = 3
             self.find_pub.publish(msg) #ta mais pra direita
+        self.get_logger().info(f"left: {left} right: {right}")

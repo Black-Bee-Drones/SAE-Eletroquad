@@ -25,7 +25,7 @@ class DepthStateMachine(DepthMeasurement):
         super().__init__(cap)
 
         self.state = START
-        self.next_state = BLACK
+        self.next_state = BLUE
 
         self.depth_st_sub = self.create_subscription(Int8, "switch_state", self.switch_state_callback, 10)
 
@@ -55,21 +55,21 @@ class DepthStateMachine(DepthMeasurement):
             self.state = PINK
             self.detector = self.pink_detector
             self.lab_detector = self.pink_lab
-            self.next_state = RED
+            self.next_state = BLUE
 
         elif self.next_state == RED:
             self.get_logger().info("Filtering RED")
             self.state = RED
             self.detector = self.red_detector
             self.lab_detector = self.red_lab
-            self.next_state = BLUE
+            self.next_state = BLACK
         
         elif self.next_state == BLUE:
             self.get_logger().info("Filtering BLUE")
             self.state = BLUE
             self.detector = self.blue_detector
             self.lab_detector = self.blue_lab
-            self.next_state = BLACK
+            self.next_state = RED
 
         elif self.next_state == BLACK:
             self.get_logger().info("Filtering BLACK")

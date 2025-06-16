@@ -43,7 +43,7 @@ class MovementStateMachine(Node):
     def distance_callback(self, msg):
         self.distance_to_object = msg.data
         self.get_logger().info(f'DISTANCE{self.distance_to_object}')
-        if self.distance_to_object < 250:
+        if self.distance_to_object < 230:
             self.too_close = True
         else:
             self.too_close = False
@@ -124,12 +124,12 @@ class MovementStateMachine(Node):
 
             #Moves drone until it centralizes or for max of 6 seconds
             while self.object_location != CENTER:
-                if now - start > 8:
+                if now - start > 10:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
                 self.get_logger().info("Moving drone to the left")
-                self.drone.offboard_velocity(0.0, 0.4, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, 0.3, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position += now - start
@@ -141,12 +141,12 @@ class MovementStateMachine(Node):
 
             #Moves drone until it centralizes or for max of 6 seconds
             while self.object_location != CENTER:
-                if now - start > 8:
+                if now - start > 10:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
                 self.get_logger().info("Moving drone to the right")
-                self.drone.offboard_velocity(0.0, -0.4, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, -0.3, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position -= now - start
@@ -176,7 +176,7 @@ class MovementStateMachine(Node):
             self.side = LEFT
 
         self.get_logger().info("Moving foward for 3 seconds")
-        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=5)
+        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=4)
 
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
