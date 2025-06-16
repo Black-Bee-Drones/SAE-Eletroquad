@@ -84,7 +84,7 @@ class BouncingNode(Node):
 
         self.bridge = CvBridge()
 
-        self.threshold = 150
+        self.threshold = 190
 
         self.image_height = 320
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "YOLOv11p.onnx")
@@ -249,7 +249,7 @@ class BouncingNode(Node):
         self.drone.offboard_gps_position(
             lat_setpoint=lat,
             lon_setpoint=lon,
-            alt_setpoint=5.0,
+            alt_setpoint=4.0,
             heading=self.drone.gps_controller.calculate_bearing(lat, lon),
             precision_radius=0.1
         )
@@ -339,11 +339,11 @@ class BouncingNode(Node):
 
         error_front, error_sides = self.calculate_error()
         if error_front != None:
-            kp = 0.5
+            kpy, kpx = 0.1, 0.03
             start_time = time.time()
-            self.get_logger().info(f"Moving drone with: x:{error_front*kp} | y:{error_sides*kp}")
-            while time.time() - start_time < 0.5:
-                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+            self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
+            
+            self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, -0.3, 0.0, time=1)
 
             self.get_logger().info(f"Finished first adjust")
 
@@ -363,11 +363,11 @@ class BouncingNode(Node):
         error_front, error_sides = self.calculate_error()
 
         if error_front != None:
-            kp = 0.5
+            kpy, kpx = 0.1, 0.03
             start_time = time.time()
-            self.get_logger().info(f"Moving drone with: x:{error_front*kp} | y:{error_sides*kp}")
-            while time.time() - start_time < 0.5:
-                self.drone.offboard_velocity(error_front*kp, error_sides*kp, -0.5, 0.0)
+            self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
+
+            self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, -0.3, 0.0, time=1)
 
             self.get_logger().info(f"Finished second adjust, landing...")
 

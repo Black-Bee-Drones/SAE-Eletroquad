@@ -6,6 +6,7 @@ from cv_bridge import CvBridge
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 import subprocess
 import re
+import time
 
 class CameraPublisher(Node):
     def __init__(self):
@@ -69,10 +70,12 @@ class CameraPublisher(Node):
         # Desativa exposição automática e fixa a exposição
         self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1.0)  # 1 = manual, 3 = auto
 
+        time.sleep(1)
+
         subprocess.run([
             '/usr/bin/v4l2-ctl',
             '-d', self.device,
-            '-c', 'exposure_absolute=2000'
+            '-c', 'exposure_absolute=700'
         ], check=True)
 
         # Timer para capturar imagens a 10 Hz
