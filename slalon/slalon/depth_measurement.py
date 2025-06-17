@@ -103,6 +103,8 @@ class DepthMeasurement(Node):
         left = np.count_nonzero(self.pipe_in_roi[:, 0:320])
         right= np.count_nonzero(self.pipe_in_roi[:, 320:640])
 
+        self.get_logger().info(f"distance: {distance:.2f}")
+
         msg = Int8()
 
         if not left and not right:
@@ -114,7 +116,7 @@ class DepthMeasurement(Node):
         else:
             msg.data = 3
             self.find_pub.publish(msg) #ta mais pra direita
-        self.get_logger().info(f"left: {left} right: {right}")
+        #self.get_logger().info(f"left: {left} right: {right}")
     
         msg = Float32()
         msg.data = float(distance)
@@ -127,5 +129,6 @@ class DepthMeasurement(Node):
         #cv2.imshow("pipe_area", pipe_area)
         #cv2.imshow("result", self.pipe_in_roi)
         #cv2.imshow("mask", self.detector.mask)
+
 
 

@@ -41,7 +41,7 @@ class MovementStateMachine(Node):
 
     def distance_callback(self, msg):
         self.distance_to_object = msg.data
-        if self.distance_to_object < 250:
+        if 30 < self.distance_to_object < 180 :
             self.too_close = True
         else:
             self.too_close = False
@@ -86,6 +86,13 @@ class MovementStateMachine(Node):
                     self.get_logger().info(f"vorta {found}")
                     self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, 0.5, time=3.0)
 
+        start = time.time()        
+        now = time.time()
+
+        while now - start < 3:
+            now = time.time()
+            rclpy.spin_once(self)
+
         return self.object_location
 
     def search(self):
@@ -127,7 +134,7 @@ class MovementStateMachine(Node):
                     return False
                 
                 self.get_logger().info("Moving drone to the left")
-                self.drone.offboard_velocity(0.0, 0.3, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, 0.25, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position += now - start
@@ -144,7 +151,7 @@ class MovementStateMachine(Node):
                     return False
                 
                 self.get_logger().info("Moving drone to the right")
-                self.drone.offboard_velocity(0.0, -0.3, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, -0.25, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position -= now - start
@@ -156,7 +163,7 @@ class MovementStateMachine(Node):
         self.get_logger().info("Move_foward")
         while not self.too_close:
             self.get_logger().info("Drone going foward")
-            self.drone.offboard_velocity(1.0, 0.0, 0.0, 0.0)
+            self.drone.offboard_velocity(0.5, 0.0, 0.0, 0.0)
             rclpy.spin_once(self)
 
         self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.0, False)
@@ -164,17 +171,30 @@ class MovementStateMachine(Node):
     def pass_by(self):
         if self.side == LEFT:
             self.get_logger().info("Moving drone to the left for 2 seconds")
-            self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=2)
-            self.lateral_position += 2
+            self.drone.offboard_velocity_timer(0.0, 0.6, 0.0, 0.0, time=3)
+            self.lateral_position += 3
             self.side = RIGHT
         else:
             self.get_logger().info("Moving drone to the right for 2 seconds")
-            self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=2)
-            self.lateral_position -= 2
+            self.drone.offboard_velocity_timer(0.0, -0.6, 0.0, 0.0, time=3)
+            self.lateral_position -= 3
             self.side = LEFT
 
+        msg = Int8()
+        self.depth_st_pub.publish(msg)
+        self.get_logger().info("Repeating states for next pipe...")
+        while self.changed_color_ok != 1:
+            rclpy.spin_once(self)
+        self.changed_color_ok = 0
+
         self.get_logger().info("Moving foward for 3 seconds")
-        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=5)
+        start = time.time()
+        now = time.time()
+
+        while now - start < 4:
+            now = time.time()
+            self.drone.offboard_velocity(0.5, 0.0, 0.0, 0.0)
+            rclpy.spin_once(self) 
 
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
@@ -231,12 +251,7 @@ class MovementStateMachine(Node):
                 self.state = 5
             else:
                 self.state = 1
-                msg = Int8()
-                self.depth_st_pub.publish(msg)
-                self.get_logger().info("Repeating states for next pipe...")
-                while self.changed_color_ok != 1:
-                    rclpy.spin_once(self)
-                self.changed_color_ok = 0
+                
 
 
 def main():
@@ -251,5 +266,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
