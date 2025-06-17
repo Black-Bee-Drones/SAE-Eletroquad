@@ -63,7 +63,7 @@ class DepthStateMachine(DepthMeasurement):
             self.get_logger().info("Filtering BLUE")
             self.state = BLUE
             self.detector = self.blue_detector
-            self.next_state = BLACK
+            self.next_state = PINK
 
 
         elif self.next_state == BLACK:

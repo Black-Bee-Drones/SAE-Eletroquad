@@ -29,7 +29,6 @@ class MovementStateMachine(Node):
         self.count_pipe = 0
         self.where_is_pipe = 0
         self.lateral_position = 0.0
-        self.too_close = False
 
         self.changed_color_ok = 0
 
@@ -41,10 +40,6 @@ class MovementStateMachine(Node):
 
     def distance_callback(self, msg):
         self.distance_to_object = msg.data
-        if 30 < self.distance_to_object < 180 :
-            self.too_close = True
-        else:
-            self.too_close = False
     
 
     def find_object_callback(self, msg):
@@ -128,13 +123,16 @@ class MovementStateMachine(Node):
             now = time.time()
 
             #Moves drone until it centralizes or for max of 6 seconds
+
+            cancel_timeout = 15
             while self.object_location != RIGHT:
-                if now - start > 8:
+                if self.object_location != NOWHERE: cancel_timeout -= 1
+                if now - start > 16 and cancel_timeout > 0:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
                 self.get_logger().info("Moving drone to the left")
-                self.drone.offboard_velocity(0.0, 0.25, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, 0.2, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position += now - start
@@ -145,30 +143,38 @@ class MovementStateMachine(Node):
             now = time.time()
 
             #Moves drone until it centralizes or for max of 6 seconds
+            cancel_timeout = 15
             while self.object_location != LEFT:
-                if now - start > 8:
+                if self.object_location != NOWHERE: cancel_timeout -= 1
+                if now - start > 16 and cancel_timeout > 0:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
                 self.get_logger().info("Moving drone to the right")
-                self.drone.offboard_velocity(0.0, -0.25, 0.0, 0.0)
+                self.drone.offboard_velocity(0.0, -0.2, 0.0, 0.0)
                 now = time.time()
                 rclpy.spin_once(self)
             self.lateral_position -= now - start
+
+        start = now = time.time()
+        while now - start < 3:
+            now = time.time()
+            rclpy.spin_once(self)
 
         return True
         
 
     def move_foward(self):
         self.get_logger().info("Move_foward")
-        while not self.too_close:
+        while self.distance_to_object > 180 or self.distance_to_object == 0:
             self.get_logger().info("Drone going foward")
             self.drone.offboard_velocity(0.5, 0.0, 0.0, 0.0)
             rclpy.spin_once(self)
 
-        self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.0, False)
-
     def pass_by(self):
+
+        dist = self.distance_to_object
+
         if self.side == LEFT:
             self.get_logger().info("Moving drone to the left for 2 seconds")
             self.drone.offboard_velocity_timer(0.0, 0.6, 0.0, 0.0, time=3)
@@ -191,11 +197,18 @@ class MovementStateMachine(Node):
         start = time.time()
         now = time.time()
 
-        while now - start < 4 and not self.too_close:
-            now = time.time()
-            self.drone.offboard_velocity(0.5, 0.0, 0.0, 0.0)
-            rclpy.spin_once(self) 
+        self.get_logger().info(f"dist medida para ir: {dist}")
 
+        if dist < 100:
+            self.drone.offboard_velocity_timer(linear_x=0.5, time=1.5)
+
+        elif dist < 200:
+            self.drone.offboard_velocity_timer(linear_x=0.5, time=2.5)
+
+        else:
+            self.drone.offboard_velocity_timer(linear_x=0.5, time=3.0)
+
+            
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
 

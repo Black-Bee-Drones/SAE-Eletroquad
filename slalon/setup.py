@@ -23,6 +23,7 @@ setup(
         'console_scripts': [
             'depth_st = slalon.depth_st:main',
             'movement = slalon.movement:main',
+            'camera_node = slalon.camera_node:main',
             'test_detection = slalon.test_detection:main'
         ],
         'launch': [

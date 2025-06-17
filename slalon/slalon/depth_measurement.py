@@ -33,6 +33,8 @@ class DepthMeasurement(Node):
             cap = cap_param
 
         self.cap = cv2.VideoCapture(cap)
+        self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        self.cap.set(cv2.CAP_PROP_FOCUS, 0)  # pode variar entre 0–255
 
         self.width = 0
 
