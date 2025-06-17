@@ -7,7 +7,6 @@ from time import sleep
 import time
 
 NOWHERE = 0
-CENTER = 1
 LEFT = 2
 RIGHT = 3
 
@@ -42,8 +41,7 @@ class MovementStateMachine(Node):
 
     def distance_callback(self, msg):
         self.distance_to_object = msg.data
-        self.get_logger().info(f'DISTANCE{self.distance_to_object}')
-        if self.distance_to_object < 230:
+        if self.distance_to_object < 250:
             self.too_close = True
         else:
             self.too_close = False
@@ -98,17 +96,17 @@ class MovementStateMachine(Node):
             self.where_is_pipe = self.right_or_left()
 
             if self.where_is_pipe == NOWHERE:
-                self.drone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=3)
+                self.drone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=2)
                 self.where_is_pipe = self.right_or_left()
 
                 if self.where_is_pipe == NOWHERE:
-                    self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=3)
-                    self.lateral_position += 3
+                    self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=4)
+                    self.lateral_position += 4
                     self.where_is_pipe = self.right_or_left()
                     
                     if self.where_is_pipe == NOWHERE:
-                        self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=6)
-                        self.lateral_position -= 6
+                        self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=4)
+                        self.lateral_position -= 4
                         self.where_is_pipe = self.right_or_left()
             rclpy.spin_once(self)
 
@@ -123,8 +121,8 @@ class MovementStateMachine(Node):
             now = time.time()
 
             #Moves drone until it centralizes or for max of 6 seconds
-            while self.object_location != CENTER:
-                if now - start > 10:
+            while self.object_location != RIGHT:
+                if now - start > 8:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
@@ -140,8 +138,8 @@ class MovementStateMachine(Node):
             now = time.time()
 
             #Moves drone until it centralizes or for max of 6 seconds
-            while self.object_location != CENTER:
-                if now - start > 10:
+            while self.object_location != LEFT:
+                if now - start > 8:
                     self.get_logger().info("Timeout to centralize!")
                     return False
                 
@@ -176,7 +174,7 @@ class MovementStateMachine(Node):
             self.side = LEFT
 
         self.get_logger().info("Moving foward for 3 seconds")
-        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=4)
+        self.drone.offboard_velocity_timer(1.0, 0.0, 0.0, 0.0, time=5)
 
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
@@ -253,3 +251,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

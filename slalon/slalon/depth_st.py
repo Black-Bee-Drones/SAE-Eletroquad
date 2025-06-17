@@ -25,7 +25,8 @@ class DepthStateMachine(DepthMeasurement):
         super().__init__(cap)
 
         self.state = START
-        self.next_state = BLUE
+        self.next_state = RED
+
 
         self.depth_st_sub = self.create_subscription(Int8, "switch_state", self.switch_state_callback, 10)
 
@@ -35,11 +36,6 @@ class DepthStateMachine(DepthMeasurement):
         self.red_detector = ColorDetector("preset", "red_sl")
         self.black_detector = ColorDetector("preset", "black_sl")
         self.pink_detector = ColorDetector("preset", "pink_sl")
-
-        self.red_lab = ColorDetector("preset", "red_lb", ColorSpace.LAB)
-        self.blue_lab = ColorDetector("preset", "blue_lb", ColorSpace.LAB)
-        self.pink_lab = ColorDetector("preset", "pink_lb", ColorSpace.LAB)
-        self.black_lab = ColorDetector("preset", "black_lb", ColorSpace.LAB)
 
         self.cont = 0
         
@@ -54,28 +50,26 @@ class DepthStateMachine(DepthMeasurement):
             self.get_logger().info("Filtering PINK")
             self.state = PINK
             self.detector = self.pink_detector
-            self.lab_detector = self.pink_lab
-            self.next_state = BLUE
+            self.next_state = RED
+            
 
         elif self.next_state == RED:
             self.get_logger().info("Filtering RED")
             self.state = RED
             self.detector = self.red_detector
-            self.lab_detector = self.red_lab
-            self.next_state = BLACK
+            self.next_state = BLUE
         
         elif self.next_state == BLUE:
             self.get_logger().info("Filtering BLUE")
             self.state = BLUE
             self.detector = self.blue_detector
-            self.lab_detector = self.blue_lab
-            self.next_state = RED
+            self.next_state = BLACK
+
 
         elif self.next_state == BLACK:
             self.get_logger().info("Filtering BLACK")
             self.state = BLACK
             self.detector = self.black_detector
-            self.lab_detector = self.black_lab
             self.next_state = PINK
         
 
@@ -97,7 +91,6 @@ class DepthStateMachine(DepthMeasurement):
         self.switch_state()
         self.get_logger().info("rodei")
         self.create_timer(1/30, self.depth_callback)
-        self.create_timer(1/30, self.find_object)
         #self.create_timer(1, self.teste)
 
 def main(args=None):
