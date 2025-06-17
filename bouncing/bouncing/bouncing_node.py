@@ -147,7 +147,7 @@ class BouncingNode(Node):
 
         cv2.imwrite("inference.jpg", self.last_frame)
         
-        results = self.model(self.last_frame)[0]
+        results = self.model(self.last_frame, conf=0.5)[0]
         x1, y1, x2, y2 = -1, -1, -1, -1
 
         if results.boxes is None or len(results.boxes) == 0:
@@ -343,7 +343,7 @@ class BouncingNode(Node):
             start_time = time.time()
             self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
             
-            self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, -0.3, 0.0, time=1)
+            self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, -0.3, 0.0, time=1.5)
 
             self.get_logger().info(f"Finished first adjust")
 
@@ -360,22 +360,27 @@ class BouncingNode(Node):
             bool: True if drone landed successfully; False otherwise.
         """
 
-        error_front, error_sides = self.calculate_error()
+        error_sides, error_front = 1, 1
 
-        if error_front != None:
-            kpy, kpx = 0.1, 0.03
-            start_time = time.time()
-            self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
+        while error_front > 0.3 and error_sides > 0.3:
+            error_front, error_sides = self.calculate_error()
 
-            self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, -0.3, 0.0, time=1)
+            if error_front != None:
+                kpy, kpx = 0.1, 0.03
+                start_time = time.time()
+                self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
 
-            self.get_logger().info(f"Finished second adjust, landing...")
+                self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, 0.0, 0.0, time=1)
+            
+            else:
+                self.get_logger().info("Not detected!!! --- Moving UP.")
+                self.drone.offboard_velocity_timer(0.0, 0.0, 1.0, 0.0, time=1)
 
-            self.drone.land()
+        self.get_logger().info(f"Finished second adjust, landing...")
 
-            return True
-        else:
-            return False
+        self.drone.land()
+
+        return True
 
     def points_calculation(self) -> None:
         """
