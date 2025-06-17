@@ -191,7 +191,7 @@ class MovementStateMachine(Node):
         start = time.time()
         now = time.time()
 
-        while now - start < 4:
+        while now - start < 4 and not self.too_close:
             now = time.time()
             self.drone.offboard_velocity(0.5, 0.0, 0.0, 0.0)
             rclpy.spin_once(self) 
