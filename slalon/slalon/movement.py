@@ -62,7 +62,7 @@ class MovementStateMachine(Node):
                     self.get_logger().info("Object found! Left side")
                     found = True
                     self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, -0.5, time=now - start)
-                    return self.object_location
+                    return LEFT
                 now = time.time()
 
             if found == False:
@@ -76,7 +76,7 @@ class MovementStateMachine(Node):
                     if self.object_location != NOWHERE:
                         self.get_logger().info("Object found! Right side")
                         self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, 0.5, time=now - start)
-                        return self.object_location
+                        return RIGHT
                     now = time.time()
                 if found == False:
                     self.get_logger().info(f"vorta {found}")
@@ -93,10 +93,10 @@ class MovementStateMachine(Node):
 
     def search(self):
         while self.where_is_pipe == NOWHERE:
-            vel = (-1) * abs(self.lateral_position)/self.lateral_position if self.lateral_position != 0 else 0.0
-            self.drone.offboard_velocity_timer(0.0, vel, 0.0, 0.0, time=abs(self.lateral_position))
-            self.lateral_position = 0
-            self.where_is_pipe = self.right_or_left()
+            # vel = (-1) * abs(self.lateral_position)/self.lateral_position if self.lateral_position != 0 else 0.0
+            # self.drone.offboard_velocity_timer(0.0, vel, 0.0, 0.0, time=abs(self.lateral_position))
+            # self.lateral_position = 0
+            # self.where_is_pipe = self.right_or_left()
 
             if self.where_is_pipe == NOWHERE:
                 self.drone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=2)
@@ -106,7 +106,7 @@ class MovementStateMachine(Node):
                     self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=4)
                     self.lateral_position += 4
                     self.where_is_pipe = self.right_or_left()
-                    
+
                     if self.where_is_pipe == NOWHERE:
                         self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=4)
                         self.lateral_position -= 4
