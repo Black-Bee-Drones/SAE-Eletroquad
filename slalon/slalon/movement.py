@@ -7,6 +7,7 @@ from time import sleep
 import time
 
 NOWHERE = 0
+CENTER = 1
 LEFT = 2
 RIGHT = 3
 
@@ -53,7 +54,7 @@ class MovementStateMachine(Node):
             found = False
             start = time.time()
             now = time.time()
-            while now - start < 3:
+            while now - start < 2.5:
                 self.drone.offboard_velocity(0.0, 0.0, 0.0, 0.5, False)
                 rclpy.spin_once(self)
                 
@@ -69,7 +70,7 @@ class MovementStateMachine(Node):
                 self.drone.offboard_velocity_timer(0.0, 0.0, 0.0, -0.5, time=3.0)
                 start = time.time()
                 now = time.time()
-                while now - start < 3:
+                while now - start < 2.5:
                     self.drone.offboard_velocity(0.0, 0.0, 0.0, -0.5)
                     rclpy.spin_once(self)
                     if self.object_location != NOWHERE:
@@ -127,6 +128,10 @@ class MovementStateMachine(Node):
             cancel_timeout = 15
             while self.object_location != RIGHT:
                 if self.object_location != NOWHERE: cancel_timeout -= 1
+
+                if cancel_timeout <= 0:
+                    self.get_logger().info("cancelei timeout")
+
                 if now - start > 16 and cancel_timeout > 0:
                     self.get_logger().info("Timeout to centralize!")
                     return False
@@ -146,6 +151,10 @@ class MovementStateMachine(Node):
             cancel_timeout = 15
             while self.object_location != LEFT:
                 if self.object_location != NOWHERE: cancel_timeout -= 1
+
+                if cancel_timeout <= 0:
+                    self.get_logger().info("cancelei timeout")
+
                 if now - start > 16 and cancel_timeout > 0:
                     self.get_logger().info("Timeout to centralize!")
                     return False

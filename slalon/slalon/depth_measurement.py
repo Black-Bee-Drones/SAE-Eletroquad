@@ -112,6 +112,9 @@ class DepthMeasurement(Node):
         if not left and not right:
             msg.data = 0
             self.find_pub.publish(msg) #nenhum objeto encontrado
+        elif abs(left - right) < 10:
+            msg.data=1
+            self.find_pub.publish(msg)
         elif left > right:
             msg.data = 2
             self.find_pub.publish(msg) #ta mais pra esquerda
