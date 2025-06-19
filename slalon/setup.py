@@ -25,7 +25,9 @@ setup(
             'movement = slalon.movement:main',
             'camera_node = slalon.camera_node:main',
             'test_detection = slalon.test_detection:main',
-            'calibration_node = slalon.calibration:main'
+            'calibration_node = slalon.calibration:main',
+            'geo_fence_node = slalon.geofence:main',
+            'land_command = slalon.land_command:main'
         ],
         'launch': [
         'slalon_launch = slalon.launch.slalon_launch:generate_launch_description',
