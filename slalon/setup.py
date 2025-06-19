@@ -24,7 +24,8 @@ setup(
             'depth_st = slalon.depth_st:main',
             'movement = slalon.movement:main',
             'camera_node = slalon.camera_node:main',
-            'test_detection = slalon.test_detection:main'
+            'test_detection = slalon.test_detection:main',
+            'calibration_node = slalon.calibration:main'
         ],
         'launch': [
         'slalon_launch = slalon.launch.slalon_launch:generate_launch_description',

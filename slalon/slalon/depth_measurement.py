@@ -94,7 +94,7 @@ class DepthMeasurement(Node):
         self.pipe_in_roi = cv2.bitwise_and(pipe_area, roi)
 
 
-        pixels_nonzero = np.count_nonzero(pixels_in_roi)/20
+        pixels_nonzero = np.count_nonzero(self.pipe_in_roi)/20
 
 
         #Regra de 3 para calcular a distancia baseado na variação do número de pixels
@@ -127,13 +127,28 @@ class DepthMeasurement(Node):
         msg.data = float(distance)
         self.pub.publish(msg)
         
-        msg = self.bridge.cv2_to_imgmsg(pipe_area, encoding='8UC1')
-        self.pub_cam.publish(msg)
+        # msg = self.bridge.cv2_to_imgmsg(pipe_area, encoding='8UC1')
+        # self.pub_cam.publish(msg)
         
-        #cv2.imshow("preview", frame)
-        #cv2.imshow("pipe_area", pipe_area)
-        #cv2.imshow("result", self.pipe_in_roi)
-        #cv2.imshow("mask", self.detector.mask)
+        cv2.imshow("frame", frame)
+        cv2.imshow("pipe_area", pipe_area)
+        cv2.imshow("pipe_in_roi", self.pipe_in_roi)
+        cv2.imshow("mask", self.detector.mask)
+
+        cv2.waitKey(1)
+
+
+def main(args=None):
+    rclpy.init()
+    st = DepthMeasurement(2)
+    st.create_timer(1/30, st.depth_callback)
+    rclpy.spin(st)
+
+
+    rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()
 
 
 

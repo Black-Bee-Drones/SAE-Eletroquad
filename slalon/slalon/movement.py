@@ -103,12 +103,12 @@ class MovementStateMachine(Node):
                 self.where_is_pipe = self.right_or_left()
 
                 if self.where_is_pipe == NOWHERE:
-                    self.drone.offboard_velocity_timer(0.0, 1.0, 0.0, 0.0, time=4)
+                    self.drone.offboard_velocity_timer(0.0, 0.5, 0.0, 0.0, time=5)
                     self.lateral_position += 4
                     self.where_is_pipe = self.right_or_left()
 
                     if self.where_is_pipe == NOWHERE:
-                        self.drone.offboard_velocity_timer(0.0, -1.0, 0.0, 0.0, time=4)
+                        self.drone.offboard_velocity_timer(0.0, -0.5, 0.0, 0.0, time=5)
                         self.lateral_position -= 4
                         self.where_is_pipe = self.right_or_left()
             rclpy.spin_once(self)
@@ -269,7 +269,7 @@ class MovementStateMachine(Node):
             self.state = 4
         
         elif self.state == 4:
-            if self.count_pipe == 4:
+            if self.count_pipe == 2:
                 self.state = 5
             else:
                 self.state = 1
