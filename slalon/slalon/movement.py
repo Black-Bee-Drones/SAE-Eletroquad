@@ -212,10 +212,10 @@ class MovementStateMachine(Node):
             self.drone.offboard_velocity_timer(linear_x=0.5, time=1.5)
 
         elif dist < 200:
-            self.drone.offboard_velocity_timer(linear_x=0.5, time=2.5)
+            self.drone.offboard_velocity_timer(linear_x=0.5, time=3.0)
 
         else:
-            self.drone.offboard_velocity_timer(linear_x=0.5, time=3.0)
+            self.drone.offboard_velocity_timer(linear_x=0.5, time=3.5)
 
             
     def movement_st(self):

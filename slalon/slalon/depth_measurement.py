@@ -130,12 +130,12 @@ class DepthMeasurement(Node):
         # msg = self.bridge.cv2_to_imgmsg(pipe_area, encoding='8UC1')
         # self.pub_cam.publish(msg)
         
-        cv2.imshow("frame", frame)
-        cv2.imshow("pipe_area", pipe_area)
-        cv2.imshow("pipe_in_roi", self.pipe_in_roi)
-        cv2.imshow("mask", self.detector.mask)
+        # cv2.imshow("frame", frame)
+        # cv2.imshow("pipe_area", pipe_area)
+        # cv2.imshow("pipe_in_roi", self.pipe_in_roi)
+        # cv2.imshow("mask", self.detector.mask)
 
-        cv2.waitKey(1)
+        # cv2.waitKey(1)
 
 
 def main(args=None):
