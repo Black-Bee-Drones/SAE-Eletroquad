@@ -9,13 +9,22 @@ from mavros_msgs.srv import (
 
 class Land_Command(Node):
     def __init__(
-            self,
-            coords
+            self
         ) -> None:
 
         super().__init__("land_command_node")
 
         self._land_srv = self._create_client(CommandTOL, "/mavros/cmd/land")
+    def _create_client(self, srv_type, service_name: str):
+        """
+        Helper function to create a ROS2 service client.
+
+        :param srv_type: ROS2 service type.
+        :param service_name (str): ROS2 service name.
+        """
+        client = self.create_client(srv_type, service_name)
+        self._clients.append(client)
+        return client
 
     def _call_service(
         self,
@@ -38,21 +47,21 @@ class Land_Command(Node):
 
         def _wait_for_service():
             while not service.wait_for_service(timeout_sec=1.0):
-                self.node.get_logger().info(
+                self.get_logger().info(
                     f"Service {service.srv_name} not available, waiting again..."
                 )
 
         def _print_result(result):
             if result is not None:
-                self.node.get_logger().info(f"\033[32;1;4m{success_message}\033[0m")
+                self.get_logger().info(f"\033[32;1;4m{success_message}\033[0m")
             else:
-                self.node.get_logger().error(f"\033[31;1;4m{failure_message}\033[0m")
+                self.get_logger().error(f"\033[31;1;4m{failure_message}\033[0m")
 
         def _handle_future(future):
             try:
                 result = future.result()
             except Exception as e:
-                self.node.get_logger().error(
+                self.get_logger().error(
                     f"Service call failed {service.srv_name}: {str(e)}"
                 )
                 result = None
@@ -60,7 +69,7 @@ class Land_Command(Node):
                 _print_result(result)
 
         _wait_for_service()
-        self.node.get_logger().info(
+        self.get_logger().info(
             f"-- Calling service {service.srv_name} | Sync: {sync}"
         )
 
