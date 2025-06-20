@@ -44,33 +44,34 @@ class DepthStateMachine(DepthMeasurement):
     def switch_state_callback(self, msg):
         self.switch_state()
 
+    # Troquei a ordem dos estados para a ordem dos postes na competição
     def switch_state(self):
         self.get_logger().info("Depth_StateMachine changing state...")
-        if self.next_state == PINK:
-            self.get_logger().info("Filtering PINK")
-            self.state = PINK
-            self.detector = self.pink_detector
-            self.next_state = RED
-            
-
-        elif self.next_state == RED:
+        if self.next_state == RED:
             self.get_logger().info("Filtering RED")
             self.state = RED
             self.detector = self.red_detector
             self.next_state = BLUE
-        
+            
+
         elif self.next_state == BLUE:
             self.get_logger().info("Filtering BLUE")
             self.state = BLUE
             self.detector = self.blue_detector
-            self.next_state = PINK
-
-
+            self.next_state = BLACK
+        
         elif self.next_state == BLACK:
             self.get_logger().info("Filtering BLACK")
             self.state = BLACK
             self.detector = self.black_detector
             self.next_state = PINK
+
+
+        elif self.next_state == PINK:
+            self.get_logger().info("Filtering PINK")
+            self.state = PINK
+            self.detector = self.pink_detector
+            self.next_state = RED
         
 
         msg = Int8()

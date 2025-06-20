@@ -194,6 +194,7 @@ class MovementStateMachine(Node):
             self.drone.offboard_velocity_timer(0.0, -0.6, 0.0, 0.0, time=3)
             self.lateral_position -= 3
             self.side = LEFT
+        
 
         msg = Int8()
         self.depth_st_pub.publish(msg)
@@ -216,7 +217,19 @@ class MovementStateMachine(Node):
 
         else:
             self.drone.offboard_velocity_timer(linear_x=0.5, time=3.5)
+        
+        #  (Galvas) LIpe sugeriu fzr isso pra tentar recentralizar ele
+        # if self.side == LEFT:
+        #     self.get_logger().info("Moving drone to the left for 2 seconds")
+        #     self.drone.offboard_velocity_timer(0.0, 0.6, 0.0, 0.0, time=3)
+        #     self.lateral_position += 3
 
+        # else:
+        #     self.get_logger().info("Moving drone to the right for 2 seconds")
+        #     self.drone.offboard_velocity_timer(0.0, -0.6, 0.0, 0.0, time=3)
+        #     self.lateral_position -= 3
+
+        
             
     def movement_st(self):
         self.get_logger().info(f"Executing movement state: {self.state}")
@@ -269,7 +282,7 @@ class MovementStateMachine(Node):
             self.state = 4
         
         elif self.state == 4:
-            if self.count_pipe == 2:
+            if self.count_pipe == 4:
                 self.state = 5
             else:
                 self.state = 1
