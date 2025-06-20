@@ -13,6 +13,26 @@ from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 import numpy as np
 from ultralytics import YOLO
 
+class PID:
+    def __init__(self, kp: float, ki: float, kd: float) -> None:
+        self.kp: float = kp
+        self.ki: float = ki
+        self.kd: float = kd
+
+        self.integral: float = 0.0
+        self.prev_error: Optional[float] = None
+
+    def compute(self, error: float, dt: float) -> float:
+        self.integral += error * dt
+        derivative = 0.0 if self.prev_error is None else (error - self.prev_error) / dt
+        output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        self.prev_error = error
+        return output
+    
+    def restart(self) -> None:
+        self.integral = 0.0
+        self.prev_error = None
+
 
 class BouncingNode(Node):
     """
@@ -268,8 +288,6 @@ class BouncingNode(Node):
             precision_radius=0.1
         )
 
-        self.drone.offboard_velocity_timer(0.7, 0.0, 0.0, 0.0, time=1.5)
-
         return self.adjust_position()
 
     def calculate_error(self, pixels = False) -> Tuple[float, float]:
@@ -373,8 +391,7 @@ class BouncingNode(Node):
 
             return self.adjust_and_land()
         else:
-            self.drone.offboard_velocity_timer(0.3, 0.0, 0.0, 0.0, time=1)
-
+            
             error_front, error_sides, detect = self.calculate_error(True)
             if detect:
                 kpy, kpx = 0.001, 0.001
@@ -412,7 +429,6 @@ class BouncingNode(Node):
 
             return self.adjust_and_land()
         else:
-            self.drone.offboard_velocity_timer(0.3, 0.0, 0.0, 0.0, time=1)
 
             error_front, error_sides, detect = self.calculate_error(True)
             if detect:
@@ -439,25 +455,36 @@ class BouncingNode(Node):
             bool: True if drone landed successfully; False otherwise.
         """
 
-        error_front, error_sides = 10, 10
+        error_front, error_sides = 50, 50
 
-        while abs(error_front) > 5 and abs(error_sides) > 5:
+        while abs(error_front) > 15 or abs(error_sides) > 15:
             error_front, error_sides, detect = self.calculate_error(True)
 
-            if detect:
-                kpy, kpx = 0.001, 0.001
-                start_time = time.time()
-                self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
+            ci_x, ci_y = 0.0, 0.0
 
-                self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, 0.0, 0.0, time=0.3)
+            if detect:
+                kpx, kpy = 0.00143, 0.00143
+                
+                ci_y += error_front * 0.00001
+                ci_x += error_sides * 0.00001
+                
+                self.get_logger().info(f"Moving drone with: x:{error_front*kpy} + {ci_y} | y:{error_sides*kpx} + {ci_x}")
+
+                self.drone.offboard_velocity_timer(error_front*kpy + ci_y, error_sides*kpx + ci_x, 0.0, 0.0, time=0.3)
+
+                if abs(error_front) < 35 and abs(error_sides) < 35:
+                    ci_x, ci_y = 0.0, 0.0
+                    self.drone.offboard_velocity_timer(0.0, 0.0, -0.3, 0.0, time=0.5)
             
             else:
-                self.get_logger().info("Not detected!!! --- Moving UP.")
-                self.drone.offboard_velocity_timer(0.0, 0.0, 0.5, 0.0, time=1)
+                self.drone.land()
+                break
 
-        self.get_logger().info(f"Finished second adjust, landing...")
+            start_t = time.time()
 
         self.drone.land()
+
+        self.get_logger().info(f"Finished second adjust, landing...")
 
         return True
 
@@ -470,14 +497,14 @@ class BouncingNode(Node):
         """
 
 
-        upper_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 1/4)
-        lower_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 3/4)
+        upper_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 3/8)
+        lower_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 5/8)
 
         middle_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 1/2)
         middle_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 1/2)
 
-        upper_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 1/4)
-        lower_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 3/4)
+        upper_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 3/8)
+        lower_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 5/8)
 
         self.search_point_1a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 2/8)
         self.search_point_2a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 3/8)
@@ -511,14 +538,14 @@ def main(args=None) -> None:
     rclpy.init(args=args)
     node = BouncingNode(
         "cross",
--23.1979885,
- -45.909908,
--23.1978449,
- -45.9098869,
--23.1980094,
- -45.9098283,
--23.1978557,
- -45.9098052
+-23.1968531,
+ -45.9097045,
+-23.1969834,
+ -45.9096567,
+-23.1968815,
+ -45.9097825,
+-23.1970036,
+ -45.9097388
     )
     node.run()
     node.destroy_node()
