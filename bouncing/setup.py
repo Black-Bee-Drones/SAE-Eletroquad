@@ -11,7 +11,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch',
-            ['launch/bouncing_launch.py']),
+            ['launch/bouncing_launch.py',
+             'launch/bouncing_v2.launch.py']),
 
     ],
     install_requires=['setuptools'],
@@ -24,6 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'bouncing_node = bouncing.bouncing_node:main',
+            'bouncing_nodev2 = bouncing.bouncing_nodev2:main',
+            'yolo_inference = bouncing.ai.yolo.yolo_inference_node:main',
             'camera_node = bouncing.camera_node:main',
             'calibration_node = bouncing.calibrate:main',
             'geofence_node = bouncing.geofence:main',

@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray, Int32MultiArray
+from std_msgs.msg import Float32MultiArray
 from mirela_sdk.image_processing.camera.image_handler import ImageHandler
 import numpy as np
 from PIL import Image
@@ -43,12 +43,12 @@ class YOLOv8Node(Node):
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres
 
-        # Publishers
-        self.center_pub = self.create_publisher(
-            Float32MultiArray, "/yolo_detections/centers", 10
-        )
-        self.ids_pub = self.create_publisher(
-            Int32MultiArray, "/yolo_detections/ids", 10
+        # Publisher for detections
+        # Structure of the Float32MultiArray:
+        # [num_detections, det1_class_id, det1_center_x, det1_center_y, det1_width, det1_height, 
+        #  det2_class_id, det2_center_x, det2_center_y, det2_width, det2_height, ...]
+        self.detections_pub = self.create_publisher(
+            Float32MultiArray, "/yolo_detections", 10
         )
 
         # ImageHandler
@@ -71,21 +71,28 @@ class YOLOv8Node(Node):
 
         print(f"Inference time: {inference_time_ms:.2f} ms")
 
-        centers = []
-        ids = []
+        # Pack all detection information into a single message
+        # Format: [num_detections, det1_class_id, det1_center_x, det1_center_y, det1_width, det1_height, ...]
+        detection_data = [float(len(detections))]
+        
         for det in detections:
             x1, y1, w, h = det.bbox
             cx = x1 + w / 2.0
             cy = y1 + h / 2.0
-            centers.extend([float(cx), float(cy)])
-            ids.append(int(det.class_id))
-        # Publish
-        center_msg = Float32MultiArray()
-        center_msg.data = centers
-        ids_msg = Int32MultiArray()
-        ids_msg.data = ids
-        self.center_pub.publish(center_msg)
-        self.ids_pub.publish(ids_msg)
+            
+            # Add class_id, center_x, center_y, width, height for each detection
+            detection_data.extend([
+                float(det.class_id),
+                float(cx),
+                float(cy),
+                float(w),
+                float(h)
+            ])
+        
+        # Publish detections
+        detections_msg = Float32MultiArray()
+        detections_msg.data = detection_data
+        self.detections_pub.publish(detections_msg)
 
     def cleanup(self):
         self.image_handler.cleanup()
