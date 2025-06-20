@@ -75,7 +75,7 @@ class CameraPublisher(Node):
         subprocess.run([
             '/usr/bin/v4l2-ctl',
             '-d', self.device,
-            '-c', 'exposure_time_absolute=3',
+            '-c', 'exposure_absolute=3',
         ], check=True)
 
         # Timer para capturar imagens a 10 Hz

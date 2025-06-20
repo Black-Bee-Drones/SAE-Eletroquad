@@ -1,3 +1,4 @@
+
 import rclpy
 import time
 import cv2
@@ -196,6 +197,10 @@ class BouncingNode(Node):
         if x1 != -1:
             self.visit_detection(x, y)
 
+        self.points_to_visit.sort(
+                key=lambda point: self.drone.gps_controller.haversine_distance(lat=point[0], lon=point[1])
+            )
+
         while(len(self.points_to_visit) > 0):
 
             self.drone.offboard_gps_position(
@@ -321,7 +326,7 @@ class BouncingNode(Node):
 
             error_sides = (self.image_height / 2) - x
             error_front = (self.image_height / 2) - y
-            self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front*gsd}m | ERROR SIDES: {error_sides*gsd}m")
+            self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
 
             cv2.drawContours(self.last_frame, [box], 0, (255, 0, 0), 2)
 
@@ -358,7 +363,7 @@ class BouncingNode(Node):
 
         error_front, error_sides, detect = self.calculate_error(True)
         if detect:
-            kpy, kpx = 0.002, 0.002
+            kpy, kpx = 0.001, 0.001
             start_time = time.time()
             self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
             
@@ -368,11 +373,11 @@ class BouncingNode(Node):
 
             return self.adjust_and_land()
         else:
-            self.drone.offboard_velocity_timer(0.7, 0.0, 0.0, 0.0, time=1)
+            self.drone.offboard_velocity_timer(0.3, 0.0, 0.0, 0.0, time=1)
 
             error_front, error_sides, detect = self.calculate_error(True)
             if detect:
-                kpy, kpx = 0.002, 0.002
+                kpy, kpx = 0.001, 0.001
                 start_time = time.time()
                 self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
                 
@@ -397,7 +402,7 @@ class BouncingNode(Node):
 
         error_front, error_sides, detect = self.calculate_error(True)
         if detect:
-            kpy, kpx = 0.002, 0.002
+            kpy, kpx = 0.001, 0.001
             start_time = time.time()
             self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
             
@@ -407,11 +412,11 @@ class BouncingNode(Node):
 
             return self.adjust_and_land()
         else:
-            self.drone.offboard_velocity_timer(0.7, 0.0, 0.0, 0.0, time=1)
+            self.drone.offboard_velocity_timer(0.3, 0.0, 0.0, 0.0, time=1)
 
             error_front, error_sides, detect = self.calculate_error(True)
             if detect:
-                kpy, kpx = 0.002, 0.002
+                kpy, kpx = 0.001, 0.001
                 start_time = time.time()
                 self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
                 
@@ -434,17 +439,17 @@ class BouncingNode(Node):
             bool: True if drone landed successfully; False otherwise.
         """
 
-        error_sides, error_front = 1, 1
+        error_front, error_sides = 10, 10
 
-        while error_front > 5 or error_sides > 5:
+        while abs(error_front) > 5 and abs(error_sides) > 5:
             error_front, error_sides, detect = self.calculate_error(True)
 
             if detect:
-                kpy, kpx = 0.002, 0.002
+                kpy, kpx = 0.001, 0.001
                 start_time = time.time()
                 self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
 
-                self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, 0.0, 0.0, time=0.5)
+                self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, 0.0, 0.0, time=0.3)
             
             else:
                 self.get_logger().info("Not detected!!! --- Moving UP.")
