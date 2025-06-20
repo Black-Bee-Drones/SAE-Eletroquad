@@ -26,6 +26,13 @@ from hook.utils.distance_parameters import (
 )
 from hook.utils.distance_estimation import DistanceEstimator, EstimationMethod
 from mirela_interfaces.msg import LineInfo
+from hook.utils.distance_parameters import (
+    DISTANCE_CALIBRATION_CONST,
+    TARGET_DISTANCE_CM,
+    DISTANCE_TOLERANCE_CM,
+)
+from hook.utils.distance_estimation import DistanceEstimator, EstimationMethod
+from mirela_interfaces.msg import LineInfo
 from mirela_interfaces.msg import LineInfo
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 
@@ -45,6 +52,7 @@ class PerformDescent(State):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
         self.line_info_sub = None
+        self.distance_estimator = DistanceEstimator()
         self.distance_estimator = DistanceEstimator()
 
         # Data from subscriber
@@ -92,6 +100,10 @@ class PerformDescent(State):
             current_dist_cm = self.distance_estimator.estimate_distance(
                 self.hose_height
             )
+            # 1. Estimate current distance using distance estimator
+            current_dist_cm = self.distance_estimator.estimate_distance(
+                self.hose_height
+            )
             distance_m = current_dist_cm / 100.0
 
             # 2. Check for success condition
@@ -100,6 +112,7 @@ class PerformDescent(State):
                 yasmin.YASMIN_LOG_INFO("Reached the target distance to the hose.")
                 mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 self.node.destroy_subscription(self.line_info_sub)
+                mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 return SUCCEED
 
@@ -115,7 +128,7 @@ class PerformDescent(State):
 
             # X velocity (forward/backward centering with dynamic offset)
             offset_px = ImageCalculus.calculate_offset_pixels(
-                0.089, distance_m, 43.3, 480
+                0.083, distance_m, 43.3, 480
             )
             setpoint_y = IMAGE_CENTER_Y + offset_px
             error_y = setpoint_y - self.center_y
@@ -130,6 +143,7 @@ class PerformDescent(State):
             # 4. Send velocity command
             mavdrone.offboard_velocity(
                 linear_x=vx, linear_y=0.0, linear_z=vz, angular_z=0.0
+                linear_x=vx, linear_y=0.0, linear_z=vz, angular_z=0.0
             )
 
             rclpy.spin_once(self.node)
@@ -138,3 +152,4 @@ class PerformDescent(State):
         mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
         self.node.destroy_subscription(self.line_info_sub)
         return ABORT
+    
