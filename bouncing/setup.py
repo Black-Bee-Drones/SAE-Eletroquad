@@ -25,7 +25,9 @@ setup(
         'console_scripts': [
             'bouncing_node = bouncing.bouncing_node:main',
             'camera_node = bouncing.camera_node:main',
-            'calibration_node = bouncing.calibrate:main'
+            'calibration_node = bouncing.calibrate:main',
+            'geofence_node = bouncing.geofence:main',
+            'land_command_node = bouncing.geofence:main'
         ],
     },
 )
