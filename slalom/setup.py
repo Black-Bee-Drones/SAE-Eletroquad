@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'slalom_mission = slalom.slalom_mission:main',
+            'black_line_detection_node = slalom.utils.black_line_detection:main'
         ],
     },
 )

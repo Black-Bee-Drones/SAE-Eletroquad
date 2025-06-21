@@ -365,7 +365,14 @@ class SwitchToBlackDetection(State):
         ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
 
         # Start the black line detection node
-        black_detection_cmd = "ros2 run slalom black_line_detection_node"
+        black_detection_cmd = (
+            "ros2 run slalom black_line_detection_node "
+            "--ros-args "
+            f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
+            "-p cap:=2 "  # Pode ser ajustado conforme necessário
+            f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
+        )
+
         if not ProcessUtils.start_process(
             black_detection_cmd, BLACK_LINE_DETECT_NODE_NAME
         ):
