@@ -78,6 +78,9 @@ class SearchBeam(State):
 
         print(f"Direction: {self.search_direction}")
 
+        if current_color == "black_sl":
+            return SUCCEED
+
         self.line_info_sub = self.node.create_subscription(
             LineInfo,
             f"/line_state/{current_color}",
@@ -142,6 +145,9 @@ class CenterOnBeam(State):
         mavdrone = blackboard["mavdrone"]
         current_beam_index = blackboard["current_beam_index"]
         current_color = BEAM_COLORS[current_beam_index]
+
+        if current_color == "black_sl":
+            return SUCCEED
 
         yasmin.YASMIN_LOG_INFO(f"Centering on {current_color} beam...")
 
@@ -222,6 +228,9 @@ class ApproachBeam(State):
         current_beam_index = blackboard["current_beam_index"]
         current_color = BEAM_COLORS[current_beam_index]
 
+        if current_color == "black_sl":
+            return SUCCEED
+
         yasmin.YASMIN_LOG_INFO(f"Approaching {current_color} beam...")
 
         self.current_width = 0.0
@@ -297,6 +306,9 @@ class PassThroughBeam(State):
 
         side_multiplier = 1 if current_side == "left" else -1
 
+        if current_color == "black_sl":
+            return SUCCEED
+
         yasmin.YASMIN_LOG_INFO(f"Moving {current_side}...")
         mavdrone.offboard_velocity_timer(
             linear_x=0.0,
@@ -328,8 +340,9 @@ class PassThroughBeam(State):
             linear_y=0.0,
             linear_z=0.0,
             angular_z=0.0,
-            time=FORWARD_PASS_TIME - 1.0,
+            time=FORWARD_PASS_TIME - 2.4,
         )
+        mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
 
         blackboard["current_beam_index"] += 1
         blackboard["current_side"] = "right" if current_side == "left" else "left"
@@ -383,6 +396,19 @@ class SwitchToBlackDetection(State):
         time.sleep(2)  # Give time for the node to initialize
 
         return SUCCEED
+    
+class CheckBlackBeam(State):
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+
+    def execute(self, blackboard: Blackboard):
+        current_beam_index = blackboard["current_beam_index"]
+        if (
+            current_beam_index < len(BEAM_COLORS) - 2
+        ):  # Se não for o penúltimo (preto)
+            return ABORT  # Continua com a lógica normal
+        else:
+            return SUCCEED  # Muda para a detecção do preto
 
 
 class SwitchBackToLineDetection(State):
@@ -497,19 +523,5 @@ class BeamNavigationStateMachine(StateMachine):
             transitions={SUCCEED: "SEARCH_BEAM", ABORT: ABORT},
         )
 
-    def create_check_black_beam_state(self):
-        """
-        Cria um estado que verifica se o próximo beam é o preto
-        """
 
-        class CheckBlackBeam(State):
-            def execute(self, blackboard: Blackboard):
-                current_beam_index = blackboard["current_beam_index"]
-                if (
-                    current_beam_index < len(BEAM_COLORS) - 2
-                ):  # Se não for o penúltimo (preto)
-                    return ABORT  # Continua com a lógica normal
-                else:
-                    return SUCCEED  # Muda para a detecção do preto
 
-        return CheckBlackBeam()
