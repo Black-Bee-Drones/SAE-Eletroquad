@@ -143,7 +143,6 @@ class PerformDescent(State):
             # 4. Send velocity command
             mavdrone.offboard_velocity(
                 linear_x=vx, linear_y=0.0, linear_z=vz, angular_z=0.0
-                linear_x=vx, linear_y=0.0, linear_z=vz, angular_z=0.0
             )
 
             rclpy.spin_once(self.node)
