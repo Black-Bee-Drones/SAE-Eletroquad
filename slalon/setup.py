@@ -1,36 +1,39 @@
 from setuptools import find_packages, setup
 
-package_name = 'slalon'
+package_name = "slalon"
 
 setup(
     name=package_name,
-    version='0.0.0',
-    packages=find_packages(exclude=['test']),
+    version="0.0.0",
+    packages=find_packages(exclude=["test"]),
     data_files=[
-        ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/slalon_launch.py']),
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+        (
+            "share/" + package_name + "/launch",
+            ["launch/slalon_launch.py", "launch/slalom_mission_launch.py"],
+        ),
     ],
-    install_requires=['setuptools'],
+    install_requires=["setuptools"],
     zip_safe=True,
-    maintainer='lucas',
-    maintainer_email='d2023001147@unifei.edu.br',
-    description='TODO: Package description',
-    license='TODO: License declaration',
-    tests_require=['pytest'],
+    maintainer="lucas",
+    maintainer_email="d2023001147@unifei.edu.br",
+    description="TODO: Package description",
+    license="TODO: License declaration",
+    tests_require=["pytest"],
     entry_points={
-        'console_scripts': [
-            'depth_st = slalon.depth_st:main',
-            'movement = slalon.movement:main',
-            'camera_node = slalon.camera_node:main',
-            'test_detection = slalon.test_detection:main',
-            'calibration_node = slalon.calibration:main',
-            'geo_fence_node = slalon.geofence:main',
-            'land_command = slalon.land_command:main'
+        "console_scripts": [
+            "depth_st = slalon.depth_st:main",
+            "movement = slalon.movement:main",
+            "camera_node = slalon.camera_node:main",
+            "test_detection = slalon.test_detection:main",
+            "calibration_node = slalon.calibration:main",
+            "geo_fence_node = slalon.geofence:main",
+            "land_command = slalon.land_command:main",
+            "slalom_mission = slalon.slalom_mission:main",
         ],
-        'launch': [
-        'slalon_launch = slalon.launch.slalon_launch:generate_launch_description',
-    ],
+        "launch": [
+            "slalon_launch = slalon.launch.slalon_launch:generate_launch_description",
+        ],
     },
 )
