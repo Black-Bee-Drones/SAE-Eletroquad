@@ -6,11 +6,12 @@ from mirela_interfaces.msg import LineInfo
 import cv2
 import numpy as np
 
+
 class BlackLineDetectionNode(Node):
     def __init__(self):
-        super().__init__('black_line_detection_node')
-        self.publisher_ = self.create_publisher(LineInfo, 'black_line_state', 10)
-        self.detected_pub = self.create_publisher(Bool, 'black_line_detect', 10)
+        super().__init__("black_line_detection_node")
+        self.publisher_ = self.create_publisher(LineInfo, "line_state/black_sl", 10)
+        self.detected_pub = self.create_publisher(Bool, "line_detect/black_sl", 10)
         self.cap = cv2.VideoCapture(2)  # Ajuste o índice se necessário
         self.timer = self.create_timer(0.1, self.process_image)
 
@@ -20,22 +21,25 @@ class BlackLineDetectionNode(Node):
             return
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        _, mask = cv2.threshold(gray, 80, 255, cv2.THRESH_BINARY_INV)  # Ajuste o threshold conforme necessário
+        _, mask = cv2.threshold(
+            gray, 80, 255, cv2.THRESH_BINARY_INV
+        )  # Ajuste o threshold conforme necessário
 
         # Remover ruído
-        mask = cv2.erode(mask, np.ones((5,5), np.uint8), iterations=1)
-        mask = cv2.dilate(mask, np.ones((5,5), np.uint8), iterations=1)
+        mask = cv2.erode(mask, np.ones((5, 5), np.uint8), iterations=1)
+        mask = cv2.dilate(mask, np.ones((5, 5), np.uint8), iterations=1)
 
         # Filtrar colunas com menos de 200 pixels brancos
-        col_sums = np.sum(mask == 255, axis=0)  # Conta quantos pixels brancos há em cada coluna
+        col_sums = np.sum(
+            mask == 255, axis=0
+        )  # Conta quantos pixels brancos há em cada coluna
         for col in range(mask.shape[1]):
             if col_sums[col] < 200:
                 mask[:, col] = 0  # Zera a coluna inteira
 
-
         # Visualização
-        cv2.imshow('Black Line - Original', frame)
-        cv2.imshow('Black Line - Mask', mask)
+        cv2.imshow("Black Line - Original", frame)
+        cv2.imshow("Black Line - Mask", mask)
         cv2.waitKey(1)
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -62,12 +66,13 @@ class BlackLineDetectionNode(Node):
         self.detected_pub.publish(Bool(data=detected))
 
         # Atualizar visualização com linha desenhada
-        cv2.imshow('Black Line - Original', frame)
+        cv2.imshow("Black Line - Original", frame)
         cv2.waitKey(1)
 
     def destroy_node(self):
         self.cap.release()
         super().destroy_node()
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -79,5 +84,6 @@ def main(args=None):
     node.cap.release()
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

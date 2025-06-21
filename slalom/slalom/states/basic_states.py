@@ -19,7 +19,7 @@ from slalom.constants import (
     LINE_DETECTION_IMAGE_SOURCE,
     LINE_DETECTION_SHOW_VISUALIZATION,
     LINE_DETECTION_VISUALIZATION_TITLE,
-    LINE_DETECTION_METHOD
+    LINE_DETECTION_METHOD,
 )
 
 
@@ -70,7 +70,7 @@ class Takeoff(State):
             while time.time() - start_time < timeout:
                 rclpy.spin_once(self.node)
 
-                alt = TAKEOFF_ALTITUDE #mavdrone.get_rel_alt.data
+                alt = TAKEOFF_ALTITUDE  # mavdrone.get_rel_alt.data
                 yasmin.YASMIN_LOG_INFO(f"Current altitude: {alt:.2f}m")
 
                 diff = abs(alt) - TAKEOFF_ALTITUDE

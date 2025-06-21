@@ -2,6 +2,9 @@ import rclpy
 import time
 
 import yasmin
+import time
+import rclpy
+import yasmin
 from yasmin import State, StateMachine
 from yasmin import Blackboard
 from yasmin_ros.basic_outcomes import SUCCEED, ABORT
@@ -26,7 +29,16 @@ from slalom.constants import (
     FORWARD_PASS_SPEED,
     FORWARD_PASS_TIME,
     IMAGE_CENTER_X,
+    LINE_DETECT_NODE_NAME,
+    BLACK_LINE_DETECT_NODE_NAME,
+    LINE_DETECTION_SPACE,
+    LINE_DETECTION_IMAGE_SOURCE,
+    LINE_DETECTION_SHOW_VISUALIZATION,
+    LINE_DETECTION_VISUALIZATION_TITLE,
+    LINE_DETECTION_METHOD,
 )
+from slalom.utils.distance_estimation import BeamDistanceEstimator, EstimationMethod
+from mirela_sdk.utils.process import ProcessUtils
 from slalom.utils.distance_estimation import BeamDistanceEstimator, EstimationMethod
 
 
@@ -41,9 +53,10 @@ class SearchBeam(State):
     def line_info_callback(self, msg: LineInfo):
         if msg.center_x > 0 and msg.width > 0:
             self.beam_found += 1
-            yasmin.YASMIN_LOG_INFO(f"Beam found at center_x: {msg.center_x}, width: {msg.width}")
-            yasmin.YASMIN_LOG_INFO(F"Counter: {self.beam_found}")
-        
+            yasmin.YASMIN_LOG_INFO(
+                f"Beam found at center_x: {msg.center_x}, width: {msg.width}"
+            )
+            yasmin.YASMIN_LOG_INFO(f"Counter: {self.beam_found}")
 
     def execute(self, blackboard: Blackboard):
         if "mavdrone" not in blackboard:
@@ -62,7 +75,7 @@ class SearchBeam(State):
             self.search_direction = 1
         else:
             self.search_direction = -1
-        
+
         print(f"Direction: {self.search_direction}")
 
         self.line_info_sub = self.node.create_subscription(
@@ -80,8 +93,10 @@ class SearchBeam(State):
             if time.time() - direction_change_time > direction_duration:
                 self.search_direction *= -1
                 direction_change_time = time.time()
-            
-            yasmin.YASMIN_LOG_INFO(f"Sending {SEARCH_SPEED_Y * self.search_direction} linear_y velocity")
+
+            yasmin.YASMIN_LOG_INFO(
+                f"Sending {SEARCH_SPEED_Y * self.search_direction} linear_y velocity"
+            )
 
             mavdrone.offboard_velocity(
                 linear_x=0.0,
@@ -242,7 +257,11 @@ class ApproachBeam(State):
                     return SUCCEED
 
                 mavdrone.offboard_velocity(
-                    linear_x=max(0.6, APPROACH_SPEED * abs((APPROACH_DISTANCE - estimated_distance_m))),
+                    linear_x=max(
+                        0.6,
+                        APPROACH_SPEED
+                        * abs((APPROACH_DISTANCE - estimated_distance_m)),
+                    ),
                     linear_y=0.0,
                     linear_z=0.0,
                     angular_z=0.0,
@@ -309,7 +328,7 @@ class PassThroughBeam(State):
             linear_y=0.0,
             linear_z=0.0,
             angular_z=0.0,
-            time=FORWARD_PASS_TIME-1.0,
+            time=FORWARD_PASS_TIME - 1.0,
         )
 
         blackboard["current_beam_index"] += 1
@@ -333,6 +352,65 @@ class CheckMissionComplete(State):
             next_color = BEAM_COLORS[current_beam_index]
             yasmin.YASMIN_LOG_INFO(f"Next beam: {next_color}")
             return ABORT
+
+
+class SwitchToBlackDetection(State):
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+
+    def execute(self, blackboard: Blackboard):
+        yasmin.YASMIN_LOG_INFO("Switching to black beam detection...")
+
+        # Stop the generic line detection node
+        ProcessUtils.kill_process(LINE_DETECT_NODE_NAME)
+
+        # Start the black line detection node
+        black_detection_cmd = "ros2 run slalom black_line_detection_node"
+        if not ProcessUtils.start_process(
+            black_detection_cmd, BLACK_LINE_DETECT_NODE_NAME
+        ):
+            yasmin.YASMIN_LOG_ERROR("Failed to start black line detection node.")
+            return ABORT
+
+        yasmin.YASMIN_LOG_INFO("Black line detection node started successfully.")
+        time.sleep(2)  # Give time for the node to initialize
+
+        return SUCCEED
+
+
+class SwitchBackToLineDetection(State):
+    def __init__(self):
+        super().__init__(outcomes=[SUCCEED, ABORT])
+
+    def execute(self, blackboard: Blackboard):
+        yasmin.YASMIN_LOG_INFO("Switching back to regular line detection...")
+
+        # Stop the black line detection node
+        ProcessUtils.kill_process(BLACK_LINE_DETECT_NODE_NAME)
+
+        # Restart the generic line detection node for the remaining colors
+        colors_str = BEAM_COLORS[-1]  # Only the last color (pink_sl)
+        spaces_str = LINE_DETECTION_SPACE
+
+        line_detection_cmd = (
+            "ros2 run mirela_sdk line_detection_node "
+            "--ros-args "
+            f"-p line_colors:={colors_str} "
+            f"-p spaces:={spaces_str} "
+            f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
+            f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
+            f"-p visualization_name:='{LINE_DETECTION_VISUALIZATION_TITLE}' "
+            f"-p method:={LINE_DETECTION_METHOD} "
+        )
+
+        if not ProcessUtils.start_process(line_detection_cmd, LINE_DETECT_NODE_NAME):
+            yasmin.YASMIN_LOG_ERROR("Failed to restart line detection node.")
+            return ABORT
+
+        yasmin.YASMIN_LOG_INFO("Line detection node restarted successfully.")
+        time.sleep(2)  # Give time for the node to initialize
+
+        return SUCCEED
 
 
 class BeamNavigationStateMachine(StateMachine):
@@ -366,5 +444,65 @@ class BeamNavigationStateMachine(StateMachine):
         self.add_state(
             "CHECK_MISSION_COMPLETE",
             CheckMissionComplete(),
-            transitions={SUCCEED: SUCCEED, ABORT: "SEARCH_BEAM"},
+            transitions={SUCCEED: SUCCEED, ABORT: "CHECK_BLACK_BEAM"},
         )
+
+        # Adiciona estados para gerenciar a transição da detecção da torre preta
+        self.add_state(
+            "CHECK_BLACK_BEAM",
+            self.create_check_black_beam_state(),
+            transitions={SUCCEED: "SWITCH_TO_BLACK_DETECTION", ABORT: "SEARCH_BEAM"},
+        )
+
+        self.add_state(
+            "SWITCH_TO_BLACK_DETECTION",
+            SwitchToBlackDetection(),
+            transitions={SUCCEED: "SEARCH_BLACK_BEAM", ABORT: ABORT},
+        )
+
+        self.add_state(
+            "SEARCH_BLACK_BEAM",
+            SearchBeam(),
+            transitions={SUCCEED: "CENTER_ON_BLACK_BEAM", ABORT: ABORT},
+        )
+
+        self.add_state(
+            "CENTER_ON_BLACK_BEAM",
+            CenterOnBeam(),
+            transitions={SUCCEED: "APPROACH_BLACK_BEAM", ABORT: ABORT},
+        )
+
+        self.add_state(
+            "APPROACH_BLACK_BEAM",
+            ApproachBeam(),
+            transitions={SUCCEED: "PASS_THROUGH_BLACK_BEAM", ABORT: ABORT},
+        )
+
+        self.add_state(
+            "PASS_THROUGH_BLACK_BEAM",
+            PassThroughBeam(),
+            transitions={SUCCEED: "SWITCH_BACK_TO_LINE_DETECTION", ABORT: ABORT},
+        )
+
+        self.add_state(
+            "SWITCH_BACK_TO_LINE_DETECTION",
+            SwitchBackToLineDetection(),
+            transitions={SUCCEED: "SEARCH_BEAM", ABORT: ABORT},
+        )
+
+    def create_check_black_beam_state(self):
+        """
+        Cria um estado que verifica se o próximo beam é o preto
+        """
+
+        class CheckBlackBeam(State):
+            def execute(self, blackboard: Blackboard):
+                current_beam_index = blackboard["current_beam_index"]
+                if (
+                    current_beam_index < len(BEAM_COLORS) - 2
+                ):  # Se não for o penúltimo (preto)
+                    return ABORT  # Continua com a lógica normal
+                else:
+                    return SUCCEED  # Muda para a detecção do preto
+
+        return CheckBlackBeam()
