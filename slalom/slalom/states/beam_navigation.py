@@ -41,6 +41,7 @@ class SearchBeam(State):
     def line_info_callback(self, msg: LineInfo):
         if msg.center_x > 0 and msg.width > 0:
             self.beam_found = True
+            yasmin.YASMIN_LOG_INFO(f"Beam found at center_x: {msg.center_x}, width: {msg.width}")
 
     def execute(self, blackboard: Blackboard):
         if "mavdrone" not in blackboard:
@@ -65,12 +66,14 @@ class SearchBeam(State):
 
         start_time = time.time()
         direction_change_time = time.time()
-        direction_duration = 3.0
+        direction_duration = 4.0
 
         while time.time() - start_time < SEARCH_TIMEOUT:
             if time.time() - direction_change_time > direction_duration:
                 self.search_direction *= -1
                 direction_change_time = time.time()
+            
+            yasmin.YASMIN_LOG_INFO(f"Sending {SEARCH_SPEED_Y * self.search_direction} linear_y velocity")
 
             mavdrone.offboard_velocity(
                 linear_x=0.0,
@@ -137,6 +140,10 @@ class CenterOnBeam(State):
             if self.current_center_x > 0:
                 error = self.current_center_x - IMAGE_CENTER_X
                 velocity_y = -CENTERING_KP * error
+
+                yasmin.YASMIN_LOG_INFO(
+                    f"Current center_x: {self.current_center_x}, Error: {error:.4f}, Velocity Y: {velocity_y:.4f}"
+                )
 
                 mavdrone.offboard_velocity(
                     linear_x=0.0,
@@ -209,33 +216,29 @@ class ApproachBeam(State):
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
             if self.current_width > 0:
-                try:
-                    estimated_distance_cm = self.distance_estimator.estimate_distance(
-                        self.current_width
-                    )
-                    estimated_distance_m = estimated_distance_cm / 100.0
+                estimated_distance_cm = self.distance_estimator.estimate_distance(
+                    self.current_width
+                )
+                estimated_distance_m = estimated_distance_cm / 100.0
 
+                yasmin.YASMIN_LOG_INFO(
+                    f"Width: {self.current_width:.1f}px -> Distance: {estimated_distance_m:.2f}m ({estimated_distance_cm:.1f}cm)"
+                )
+
+                if estimated_distance_m <= APPROACH_DISTANCE:
+                    mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                     yasmin.YASMIN_LOG_INFO(
-                        f"Width: {self.current_width:.1f}px -> Distance: {estimated_distance_m:.2f}m ({estimated_distance_cm:.1f}cm)"
+                        f"Reached approach distance to {current_color} beam!"
                     )
+                    self._cleanup_subscriber()
+                    return SUCCEED
 
-                    if estimated_distance_m <= APPROACH_DISTANCE:
-                        mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
-                        yasmin.YASMIN_LOG_INFO(
-                            f"Reached approach distance to {current_color} beam!"
-                        )
-                        self._cleanup_subscriber()
-                        return SUCCEED
-
-                except Exception as e:
-                    yasmin.YASMIN_LOG_ERROR(f"Distance estimation error: {e}")
-
-            mavdrone.offboard_velocity(
-                linear_x=APPROACH_SPEED,
-                linear_y=0.0,
-                linear_z=0.0,
-                angular_z=0.0,
-            )
+                mavdrone.offboard_velocity(
+                    linear_x=APPROACH_SPEED * (APPROACH_DISTANCE - estimated_distance_m),
+                    linear_y=0.0,
+                    linear_z=0.0,
+                    angular_z=0.0,
+                )
 
         yasmin.YASMIN_LOG_ERROR(f"Approach to {current_color} beam timed out.")
         self._cleanup_subscriber()

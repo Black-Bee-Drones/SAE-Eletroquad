@@ -19,6 +19,7 @@ from slalom.constants import (
     LINE_DETECTION_IMAGE_SOURCE,
     LINE_DETECTION_SHOW_VISUALIZATION,
     LINE_DETECTION_VISUALIZATION_TITLE,
+    LINE_DETECTION_METHOD
 )
 
 
@@ -60,7 +61,7 @@ class Takeoff(State):
         yasmin.YASMIN_LOG_INFO(f"Attempting takeoff to {TAKEOFF_ALTITUDE}m...")
         try:
             mavdrone.set_home(current_gps=True)
-            mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
+            #mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
 
             time.sleep(3)
 
@@ -69,7 +70,7 @@ class Takeoff(State):
             while time.time() - start_time < timeout:
                 rclpy.spin_once(self.node)
 
-                alt = mavdrone.get_rel_alt.data
+                alt = TAKEOFF_ALTITUDE #mavdrone.get_rel_alt.data
                 yasmin.YASMIN_LOG_INFO(f"Current altitude: {alt:.2f}m")
 
                 diff = abs(alt) - TAKEOFF_ALTITUDE
@@ -111,7 +112,8 @@ class StartLineDetection(State):
             f"-p spaces:={spaces_str} "
             f"-p show_visualization:={LINE_DETECTION_SHOW_VISUALIZATION} "
             f"-p image_source:={LINE_DETECTION_IMAGE_SOURCE} "
-            f"-p visualization_name:='{LINE_DETECTION_VISUALIZATION_TITLE}'"
+            f"-p visualization_name:='{LINE_DETECTION_VISUALIZATION_TITLE}' "
+            f"-p method:={LINE_DETECTION_METHOD} "
         )
 
         if not ProcessUtils.start_process(line_detection_cmd, LINE_DETECT_NODE_NAME):
@@ -152,7 +154,7 @@ class End(State):
     def execute(self, blackboard: Blackboard):
         yasmin.YASMIN_LOG_INFO("Mission ended. Cleaning up all processes...")
 
-        mavdrone: MavDrone = blackboard.get("mavdrone")
+        mavdrone: MavDrone = blackboard["mavdrone"]
         if mavdrone and mavdrone.get_state.armed:
             yasmin.YASMIN_LOG_INFO("Drone still armed, attempting to disarm...")
             try:
