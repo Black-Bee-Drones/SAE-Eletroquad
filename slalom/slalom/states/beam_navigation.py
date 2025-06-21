@@ -35,13 +35,15 @@ class SearchBeam(State):
         super().__init__(outcomes=[SUCCEED, ABORT])
         self.node = YasminNode.get_instance()
         self.line_info_sub = None
-        self.beam_found = False
+        self.beam_found = 0
         self.search_direction = 1
 
     def line_info_callback(self, msg: LineInfo):
         if msg.center_x > 0 and msg.width > 0:
-            self.beam_found = True
+            self.beam_found += 1
             yasmin.YASMIN_LOG_INFO(f"Beam found at center_x: {msg.center_x}, width: {msg.width}")
+            yasmin.YASMIN_LOG_INFO(F"Counter: {self.beam_found}")
+        
 
     def execute(self, blackboard: Blackboard):
         if "mavdrone" not in blackboard:
@@ -55,7 +57,13 @@ class SearchBeam(State):
         yasmin.YASMIN_LOG_INFO(f"Searching for {current_color} beam...")
 
         self.beam_found = False
-        self.search_direction = 1
+
+        if blackboard["current_side"] == "left":
+            self.search_direction = 1
+        else:
+            self.search_direction = -1
+        
+        print(f"Direction: {self.search_direction}")
 
         self.line_info_sub = self.node.create_subscription(
             LineInfo,
@@ -66,7 +74,7 @@ class SearchBeam(State):
 
         start_time = time.time()
         direction_change_time = time.time()
-        direction_duration = 4.0
+        direction_duration = 5.2
 
         while time.time() - start_time < SEARCH_TIMEOUT:
             if time.time() - direction_change_time > direction_duration:
@@ -84,7 +92,7 @@ class SearchBeam(State):
 
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
-            if self.beam_found:
+            if self.beam_found >= 14:
                 mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
                 yasmin.YASMIN_LOG_INFO(f"{current_color} beam found!")
                 self._cleanup_subscriber()
@@ -234,7 +242,7 @@ class ApproachBeam(State):
                     return SUCCEED
 
                 mavdrone.offboard_velocity(
-                    linear_x=APPROACH_SPEED * (APPROACH_DISTANCE - estimated_distance_m),
+                    linear_x=max(0.6, APPROACH_SPEED * abs((APPROACH_DISTANCE - estimated_distance_m))),
                     linear_y=0.0,
                     linear_z=0.0,
                     angular_z=0.0,
@@ -268,7 +276,7 @@ class PassThroughBeam(State):
             f"Passing through {current_color} beam on {current_side} side..."
         )
 
-        side_multiplier = -1 if current_side == "left" else 1
+        side_multiplier = 1 if current_side == "left" else -1
 
         yasmin.YASMIN_LOG_INFO(f"Moving {current_side}...")
         mavdrone.offboard_velocity_timer(
@@ -286,6 +294,22 @@ class PassThroughBeam(State):
             linear_z=0.0,
             angular_z=0.0,
             time=FORWARD_PASS_TIME,
+        )
+        mavdrone.offboard_velocity_timer(
+            linear_x=0.0,
+            linear_y=-SIDE_PASS_SPEED * side_multiplier,
+            linear_z=0.0,
+            angular_z=0.0,
+            time=SIDE_PASS_TIME + 2.0,
+        )
+
+        yasmin.YASMIN_LOG_INFO("Moving forward...")
+        mavdrone.offboard_velocity_timer(
+            linear_x=-FORWARD_PASS_SPEED,
+            linear_y=0.0,
+            linear_z=0.0,
+            angular_z=0.0,
+            time=FORWARD_PASS_TIME-1.0,
         )
 
         blackboard["current_beam_index"] += 1

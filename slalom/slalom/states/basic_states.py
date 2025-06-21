@@ -61,7 +61,7 @@ class Takeoff(State):
         yasmin.YASMIN_LOG_INFO(f"Attempting takeoff to {TAKEOFF_ALTITUDE}m...")
         try:
             mavdrone.set_home(current_gps=True)
-            #mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
+            mavdrone.arm_takeoff(TAKEOFF_ALTITUDE)
 
             time.sleep(3)
 
@@ -83,7 +83,7 @@ class Takeoff(State):
                 if diff < 0.0:
                     mavdrone.offboard_velocity(0.0, 0.0, -0.25 * diff, 0.0)
                 else:
-                    mavdrone.offboard_velocity(0.0, 0.0, 0.25 * diff, 0.0)
+                    mavdrone.offboard_velocity(0.0, 0.0, -0.25 * diff, 0.0)
 
             yasmin.YASMIN_LOG_ERROR("Takeoff timed out.")
             return ABORT
