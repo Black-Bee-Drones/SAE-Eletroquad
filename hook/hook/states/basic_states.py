@@ -102,8 +102,9 @@ class Takeoff(State):
 class ReturnToLaunch(State):
     """Returns the drone to the launch position."""
 
-    def __init__(self):
+    def __init__(self, rtl_strategy="default"):
         super().__init__(outcomes=[SUCCEED, ABORT])
+        self.rtl_strategy = rtl_strategy
 
     def execute(self, blackboard):
         if not "mavdrone" in blackboard:
@@ -112,10 +113,12 @@ class ReturnToLaunch(State):
 
         mavdrone: MavDrone = blackboard["mavdrone"]
 
-        yasmin.YASMIN_LOG_INFO("Returning to launch...")
+        yasmin.YASMIN_LOG_INFO(
+            f"Returning to launch using strategy: {self.rtl_strategy}..."
+        )
 
         try:
-            mavdrone.rtl(rtl_alt=RETURN_ALTITUDE)
+            mavdrone.rtl(rtl_alt=RETURN_ALTITUDE, rtl_strategy=self.rtl_strategy)
             return SUCCEED
         except Exception as e:
             yasmin.YASMIN_LOG_ERROR(f"RTL failed: {e}")
