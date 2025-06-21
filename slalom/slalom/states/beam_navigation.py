@@ -483,7 +483,7 @@ class BeamNavigationStateMachine(StateMachine):
         # Adiciona estados para gerenciar a transição da detecção da torre preta
         self.add_state(
             "CHECK_BLACK_BEAM",
-            self.create_check_black_beam_state(),
+            CheckBlackBeam(),
             transitions={SUCCEED: "SWITCH_TO_BLACK_DETECTION", ABORT: "SEARCH_BEAM"},
         )
 
