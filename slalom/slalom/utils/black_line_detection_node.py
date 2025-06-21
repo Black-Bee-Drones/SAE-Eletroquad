@@ -53,6 +53,67 @@ class BlackLineDetectionNode(Node):
         # Start the image handler
         self.image_handler.run()
 
+    def calc_width_height(self, mask):
+        """
+        Calculate the width and height of the detected line.
+
+        Args:
+            mask: Binary image containing the detected line
+
+        Returns:
+            Tuple containing width, height, x, y, w, h, and rotated box points
+        """
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return 0.0, 0.0, 0, 0, 0, 0, None  # No line detected
+
+        largest_contour = max(contours, key=cv2.contourArea)
+
+        rect = cv2.minAreaRect(largest_contour)
+        (x_center, y_center), (w_rect, h_rect), angle_rect = rect
+
+        box = cv2.boxPoints(rect)
+        box = np.intp(box)
+
+        x, y, w, h = cv2.boundingRect(box)
+
+        # Ensure x, y, w, h are within image bounds
+        y = max(0, y)
+        x = max(0, x)
+        h = min(h, mask.shape[0] - y)
+        w = min(w, mask.shape[1] - x)
+
+        if w > 0 and h > 0:
+            roi = mask[y : y + h, x : x + w]
+
+            threshold = 128  # Consider pixels with values > 128 as white
+            white_pixels = roi > threshold
+
+            if np.any(white_pixels):
+                # Calculate non-zero columns (for height) using the threshold
+                col_sums = np.sum(white_pixels, axis=0)
+                non_zero_cols = col_sums[col_sums > 0]
+                height = float(np.mean(non_zero_cols)) if len(non_zero_cols) > 0 else 0.0
+
+                # Calculate non-zero rows (for width) using the threshold
+                row_sums = np.sum(white_pixels, axis=1)
+                non_zero_rows = row_sums[row_sums > 0]
+                width = float(np.mean(non_zero_rows)) if len(non_zero_rows) > 0 else 0.0
+            else:
+                # If no white pixels found with threshold, try using the contour directly
+                contour_area = cv2.contourArea(largest_contour)
+                if contour_area > 0:
+                    # Estimate width and height from contour
+                    width = h_rect if h_rect > w_rect else w_rect
+                    height = w_rect if h_rect > w_rect else h_rect
+                else:
+                    width = height = 0.0
+        else:
+            # Invalid ROI dimensions
+            width = height = 0.0
+
+        return width, height, x, y, w, h, box
+
     def process_image(self, frame):
         if frame is None:
             self.get_logger().warn("Received empty frame")
@@ -89,20 +150,21 @@ class BlackLineDetectionNode(Node):
             # Find the largest contour
             largest = max(contours, key=cv2.contourArea)
             rect = cv2.minAreaRect(largest)
-            (cx, cy), (w, h), angle = rect
+            (cx, cy), (_, _), angle = rect
+
+            # Calculate width and height using the improved method
+            width, height, x, y, w, h, box = self.calc_width_height(mask)
 
             # Fill LineInfo message
             msg.center_x = float(cx)
             msg.center_y = float(cy)
             msg.angle = float(angle)
-            msg.width = float(w)
-            msg.height = float(h)
+            msg.width = float(width)
+            msg.height = float(height)
             detected = True
 
             # Draw the rotated rectangle (estimated line)
             if self.show_visualization:
-                box = cv2.boxPoints(rect)
-                box = np.intp(box)
                 cv2.drawContours(frame, [box], 0, (0, 0, 255), 2)
 
                 # Add text with measurements
@@ -117,7 +179,7 @@ class BlackLineDetectionNode(Node):
                 )
                 cv2.putText(
                     frame,
-                    f"Size: {w:.1f} x {h:.1f}",
+                    f"Size: {width:.1f} x {height:.1f}",
                     (10, 60),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5,
