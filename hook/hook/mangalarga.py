@@ -42,7 +42,7 @@ class HangTheHookSM(StateMachine):
         self.add_state(
             "TAKEOFF",
             Takeoff(),
-            transitions={SUCCEED: "CENTER_RED_BLOB", ABORT: "RETURN_TO_LAUNCH"},
+            transitions={SUCCEED: "SEARCH_BLUE_LINE", ABORT: "RETURN_TO_LAUNCH"},
         )
 
         self.add_state(
@@ -83,7 +83,7 @@ class HangTheHookSM(StateMachine):
 
         self.add_state(
             "RETURN_TO_LAUNCH",
-            ReturnToLaunch(),
+            ReturnToLaunch(rtl_strategy="gps_return"),
             transitions={SUCCEED: "END", ABORT: "END"},
         )
 

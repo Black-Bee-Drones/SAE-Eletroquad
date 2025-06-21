@@ -102,8 +102,8 @@ class Takeoff(State):
 class ReturnToLaunch(State):
     """Returns the drone to the launch position."""
 
-    def __init__(self, rtl_strategy="default"):
-        super().__init__(outcomes=[SUCCEED, ABORT])
+    def __init__(self, rtl_strategy="gps_return"):
+        super().__init__(outcomes=[SUCCEED, ABORT]) 
         self.rtl_strategy = rtl_strategy
 
     def execute(self, blackboard):

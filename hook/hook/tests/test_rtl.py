@@ -11,6 +11,7 @@ class TestRTLNode(Node):
         super().__init__('test_rtl_node')
         self.get_logger().info('Starting RTL test node...')
         self.drone = MavDrone(self)
+        self.test_sequence()
 
     def test_sequence(self):
         self.get_logger().info('RTL Test Sequence Starting')
