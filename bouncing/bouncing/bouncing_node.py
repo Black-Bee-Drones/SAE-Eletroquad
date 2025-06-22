@@ -55,17 +55,6 @@ class BouncingNode(Node):
 
         super().__init__('bouncing_node')
 
-        # Configura QoS com apenas 1 imagem no buffer
-        qos_profile = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1
-        )
-
-        self.create_subscription(Image, 'camera/image_raw', self.camera_cb, qos_profile)
-
-        self.last_frame = None
-
         figure_map: dict[str, int] = {
             "circle": 0,
             "square": 1,
@@ -81,8 +70,6 @@ class BouncingNode(Node):
 
         if self.figure_class is None:
             raise ValueError(f"Figura '{figure}' inválida. Opções válidas: {list(figure_map.keys())}")
-
-        self.bridge = CvBridge()
 
         self.image_height = 320
 
@@ -115,32 +102,19 @@ class BouncingNode(Node):
         self.points_calculation()
 
         self.points_to_visit: List[Tuple[float, float]] = [
-            self.search_point_1a, 
-            self.search_point_1b, 
-            self.search_point_2a, 
-            self.search_point_2b, 
+            self.search_point_m4,
+            self.search_point_4a, 
+            self.search_point_4b, 
             self.search_point_3a, 
-            self.search_point_3b,
-            self.search_point_4a,
-            self.search_point_4b,
-            self.search_point_m1,
+            self.search_point_3b, 
+            self.search_point_2a, 
+            self.search_point_2b,
+            self.search_point_1a,
+            self.search_point_1b,
             self.search_point_m2,
             self.search_point_m3,
             self.search_point_m4
         ]
-
-    def camera_cb(self, msg: Image):
-        """
-        ROS callback that receives and stores the latest camera frame.
-
-        Args:
-            msg (Image): ROS image message containing the camera frame.
-        """
-
-        try:
-            self.last_frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        except Exception as e:
-            self.get_logger().error(f"Erro ao converter imagem: {e}")
 
     def run_inference(self) -> Tuple[int, int]:
         """
@@ -151,10 +125,8 @@ class BouncingNode(Node):
                             (-1, -1, -1, -1) if not found.
         """
 
-        rclpy.spin_once(self, timeout_sec=0.2)
+        self.last_frame = cv2.imread('photo.jpg')
 
-        cv2.imwrite("inference.jpg", self.last_frame)
-        
         results = self.model(self.last_frame, conf=0.5)[0]
         x1, y1, x2, y2 = -1, -1, -1, -1
 
@@ -195,10 +167,6 @@ class BouncingNode(Node):
         if x1 != -1:
             self.visit_detection(x, y)
 
-        self.points_to_visit.sort(
-                key=lambda point: self.drone.gps_controller.haversine_distance(lat=point[0], lon=point[1])
-            )
-
         while(len(self.points_to_visit) > 0):
 
             self.drone.offboard_gps_position(
@@ -220,11 +188,6 @@ class BouncingNode(Node):
                 if self.visit_detection(x, y): break
 
             self.points_to_visit.pop(0)
-
-            self.points_to_visit.sort(
-                key=lambda point: self.drone.gps_controller.haversine_distance(lat=point[0], lon=point[1])
-            )
-
 
         
     def visit_detection(self, coord_x: int, coord_y: int) -> bool:
@@ -291,7 +254,7 @@ class BouncingNode(Node):
             y = (y1 + y2) // 2
 
             error_sides = (self.image_height / 2) - x
-            error_front = (self.image_height / 2) - y
+            error_front = (self.image_height / 2) - y + 10
             self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
 
             # Desenha ponto da inferência (azul)
@@ -402,14 +365,15 @@ class BouncingNode(Node):
         error_front, error_sides = 50, 50
 
         fails = 0
+        count_drops = 0
 
-        while abs(error_front) > 10 or abs(error_sides) > 10:
+        while (abs(error_front) > 10 or abs(error_sides) > 10) or count_drops < 7:
             error_front, error_sides, detect = self.calculate_error()
 
             ci_x, ci_y = 0.0, 0.0
 
             if detect:
-                kpx, kpy = 0.001, 0.001
+                kpx, kpy = 0.00218, 0.00218
                 
                 ci_y += error_front * 0.000015
                 ci_x += error_sides * 0.000015
@@ -418,9 +382,14 @@ class BouncingNode(Node):
 
                 self.drone.offboard_velocity_timer(error_front*kpy + ci_y, error_sides*kpx + ci_x, 0.0, 0.0, time=0.3)
 
-                if abs(error_front) < 35 and abs(error_sides) < 35:
+                if abs(error_front) < 30 and abs(error_sides) < 30:
                     ci_x, ci_y = 0.0, 0.0
+                    count_drops += 1
+                    self.get_logger().info(f"Count drops: {count_drops}")
                     self.drone.offboard_velocity_timer(0.0, 0.0, -0.3, 0.0, time=0.5)
+                    if count_drops >= 5:
+                        self.get_logger().info("Count drops reached 4, landing...")
+                        break
             
             else:
                 fails += 1

@@ -11,20 +11,6 @@ import time
 class CameraPublisher(Node):
     def __init__(self):
         super().__init__('camera_publisher')
-
-        # Configura QoS com apenas 1 imagem no buffer
-        qos_profile = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1
-        )
-
-        # Publisher para imagem
-        self.publisher_ = self.create_publisher(Image, 'camera/image_raw', qos_profile)
-
-        # OpenCV bridge
-        self.bridge = CvBridge()
-
         C920_DEVICES = [
             'HD Pro Webcam C920',
             'Logi Webcam C920e',
@@ -78,8 +64,8 @@ class CameraPublisher(Node):
             '-c', 'exposure_absolute=3',
         ], check=True)
 
-        # Timer para capturar imagens a 10 Hz
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        # Timer para capturar imagens a 30 Hz
+        self.timer = self.create_timer(0.03, self.timer_callback)
 
     def timer_callback(self):
         ret, frame = self.cap.read()
@@ -95,9 +81,7 @@ class CameraPublisher(Node):
         # Redimensionar para 320x320
         frame = cv2.resize(crop, (320, 320), interpolation=cv2.INTER_AREA)
 
-
-        msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
-        self.publisher_.publish(msg)
+        cv2.imwrite('photo.jpg', frame)
 
     def destroy_node(self):
         self.cap.release()
