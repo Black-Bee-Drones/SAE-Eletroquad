@@ -7,11 +7,14 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from mirela_sdk.control.mavros.mavros_api import MavDrone
 from mirela_sdk.image_processing.camera.image_calculus import ImageCalculus
 import numpy as np
 from ultralytics import YOLO
+from geopy.distance import distance
+from geopy.point import Point
+
 
 class PID:
     def __init__(self, kp: float, ki: float, kd: float) -> None:
@@ -41,22 +44,13 @@ class BouncingNode(Node):
     """
 
 
-    def __init__(
-            self, 
-            figure: str,
-            p1_lat: float, p1_lon: float,
-            p2_lat: float, p2_lon: float,
-            p3_lat: float, p3_lon: float,
-            p4_lat: float, p4_lon: float
-        ) -> None:
-
+    def __init__(self, figure: str) -> None:
         """
         Initializes the BouncingNode with the specified target figure and GPS area corners.
 
         Args:
             figure (str): Name of the target figure to detect (e.g., "circle").
-            p1_lat, p1_lon, ..., p4_lat, p4_lon (float): GPS coordinates of the rectangular search area corners, 
-                ordered as top-left, top-right, bottom-left, bottom-right.
+            ordered as top-left, top-right, bottom-left, bottom-right.
         """
 
 
@@ -73,7 +67,6 @@ class BouncingNode(Node):
 
         self.last_frame = None
 
-
         figure_map: dict[str, int] = {
             "circle": 0,
             "square": 1,
@@ -85,29 +78,15 @@ class BouncingNode(Node):
             "house": 7
         }
 
-        figure_size_map: dict[int, float] = {
-            0: 0.793,
-            1: 0.554,
-            2: 0.596,
-            3: 0.687,
-            4: 0.710,
-            5: 0.715,
-            6: 0.790,
-            7: 0.715
-        }
-
         self.figure_class = figure_map.get(figure, None)
 
-        self.figure_size = figure_size_map.get(self.figure_class, None)
-        
         if self.figure_class is None:
             raise ValueError(f"Figura '{figure}' inválida. Opções válidas: {list(figure_map.keys())}")
 
         self.bridge = CvBridge()
 
-        self.threshold = 175
-
         self.image_height = 320
+
         model_path = os.path.join(os.path.dirname(__file__), "ai", "yolo", "yolov11n.onnx")
         self.model = YOLO(model_path, task='detect')
         
@@ -290,7 +269,7 @@ class BouncingNode(Node):
 
         return self.adjust_position()
 
-    def calculate_error(self, pixels = False) -> Tuple[float, float]:
+    def calculate_error(self) -> Tuple[float, float]:
         """
         Analyzes the bounding box of the detected object and computes positional errors
         (front and side) based on the drone's image center and the object’s estimated size.
@@ -303,8 +282,6 @@ class BouncingNode(Node):
 
         detect = False
 
-        gsd = 0
-
         error_front, error_sides = 0.0, 0.0
 
         if x1 >= 0:
@@ -314,46 +291,16 @@ class BouncingNode(Node):
             x = (x1 + x2) // 2
             y = (y1 + y2) // 2
 
-            crop = self.last_frame[int(y1):int(y2), int(x1):int(x2)]
-            lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB)
-            l_channel, _, _ = cv2.split(lab)
-            _, thresh = cv2.threshold(l_channel, self.threshold, 255, cv2.THRESH_BINARY_INV)
-
-            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            cnt = max(contours, key=cv2.contourArea)
-
-            rect = cv2.minAreaRect(cnt)
-            box = cv2.boxPoints(rect)
-            box = np.int0(box)
-
-            width, height = rect[1]
-            side_length = max(width, height)
-
-            gsd = self.figure_size / side_length
-
-            drone_height = (self.image_height / 2) * gsd / np.tan(np.radians(43.3/2))
-
-            self.get_logger().info(f"drone height calculated pixel: {drone_height}")
-
-            camera_displacement = ImageCalculus.calculate_offset_pixels(
-                0.12, drone_height, 43.3, self.image_height
-            )
-
-            self.get_logger().info(f"cam_dis: {camera_displacement * gsd}")
-
             error_sides = (self.image_height / 2) - x
             error_front = (self.image_height / 2) - y
             self.get_logger().info(f"--- X:{x} | Y:{y} | ERROR FRONT: {error_front} | ERROR SIDES: {error_sides}")
-
-            cv2.drawContours(self.last_frame, [box], 0, (255, 0, 0), 2)
 
             # Desenha ponto da inferência (azul)
             cv2.circle(self.last_frame, (int(x), int(y)), 5, (255, 0, 0), -1)
 
             # Desenha ponto do centro do drone (verde)
             center_x = (self.image_height // 2)
-            center_y = (self.image_height // 2) + int(camera_displacement)
+            center_y = (self.image_height // 2)
             cv2.circle(self.last_frame, (center_x, center_y), 5, (0, 255, 0), -1)
 
             # Desenha ponto do centro do drone (verde)
@@ -364,10 +311,8 @@ class BouncingNode(Node):
             # Salva a imagem
             cv2.imwrite("contorno.jpg", self.last_frame)
 
-        if not pixels:
-            return gsd * error_front, gsd * error_sides, detect
-        else:
-            return error_front, error_sides, detect
+        
+        return error_front, error_sides, detect
 
     def adjust_position(self) -> bool:
         """
@@ -379,7 +324,7 @@ class BouncingNode(Node):
         """
 
 
-        error_front, error_sides, detect = self.calculate_error(True)
+        error_front, error_sides, detect = self.calculate_error()
         if detect:
             kpy, kpx = 0.001, 0.001
             start_time = time.time()
@@ -392,7 +337,7 @@ class BouncingNode(Node):
             return self.adjust_and_land()
         else:
             
-            error_front, error_sides, detect = self.calculate_error(True)
+            error_front, error_sides, detect = self.calculate_error()
             if detect:
                 kpy, kpx = 0.001, 0.001
                 start_time = time.time()
@@ -417,26 +362,26 @@ class BouncingNode(Node):
         """
 
 
-        error_front, error_sides, detect = self.calculate_error(True)
+        error_front, error_sides, detect = self.calculate_error()
         if detect:
             kpy, kpx = 0.001, 0.001
             start_time = time.time()
             self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
             
-            self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, 0.0, 0.0, time=0.5)
+            self.drone.offboard_velocity_timer(min(0.3, error_front*kpy), min(0.3, error_sides*kpx), 0.0, 0.0, time=0.5)
 
             self.get_logger().info(f"Finished first adjust")
 
             return self.adjust_and_land()
         else:
 
-            error_front, error_sides, detect = self.calculate_error(True)
+            error_front, error_sides, detect = self.calculate_error()
             if detect:
                 kpy, kpx = 0.001, 0.001
                 start_time = time.time()
                 self.get_logger().info(f"Moving drone with: x:{error_front*kpy} | y:{error_sides*kpx}")
-                
-                self.drone.offboard_velocity_timer(error_front*kpy, error_sides*kpx, 0.0, 0.0, time=0.5)
+
+                self.drone.offboard_velocity_timer(min(0.3, error_front*kpy), min(0.3, error_sides*kpx), 0.0, 0.0, time=0.5)
 
                 self.get_logger().info(f"Finished first adjust")
 
@@ -458,15 +403,15 @@ class BouncingNode(Node):
         error_front, error_sides = 50, 50
 
         while abs(error_front) > 15 or abs(error_sides) > 15:
-            error_front, error_sides, detect = self.calculate_error(True)
+            error_front, error_sides, detect = self.calculate_error()
 
             ci_x, ci_y = 0.0, 0.0
 
             if detect:
-                kpx, kpy = 0.00143, 0.00143
+                kpx, kpy = 0.001, 0.001
                 
-                ci_y += error_front * 0.00001
-                ci_x += error_sides * 0.00001
+                ci_y += error_front * 0.000015
+                ci_x += error_sides * 0.000015
                 
                 self.get_logger().info(f"Moving drone with: x:{error_front*kpy} + {ci_y} | y:{error_sides*kpx} + {ci_x}")
 
@@ -487,6 +432,48 @@ class BouncingNode(Node):
         self.get_logger().info(f"Finished second adjust, landing...")
 
         return True
+    
+
+    def gerar_poligono_com_heading(self, lat_central, lon_central, heading, frente=20, tras=20, lado=15):
+        """
+        Gera os 4 vértices de um polígono retangular orientado por um heading.
+
+        Args:
+            lat_central (float): Latitude do ponto central.
+            lon_central (float): Longitude do ponto central.
+            heading (float): Direção em graus (0 = norte, 90 = leste, etc.).
+            frente (float): Distância em metros para frente (na direção do heading).
+            tras (float): Distância em metros para trás (oposto ao heading).
+            lado (float): Distância em metros para os lados (perpendicular ao heading).
+
+        Returns:
+            List[Tuple[float, float]]: Lista com 4 tuplas (lat, lon), no sentido horário.
+        """
+        centro = Point(lat_central, lon_central)
+
+        # Ponto frontal (à frente do centro, na direção do heading)
+        frente_pt = distance(meters=frente).destination(centro, heading % 360)
+        # Ponto traseiro (na direção oposta)
+        tras_pt = distance(meters=tras).destination(centro, (heading + 180) % 360)
+
+        # Cantos do retângulo
+        # Vértice frontal esquerdo
+        frente_esq = distance(meters=lado).destination(frente_pt, (heading - 90) % 360)
+        # Vértice frontal direito
+        frente_dir = distance(meters=lado).destination(frente_pt, (heading + 90) % 360)
+
+        # Vértice traseiro direito
+        tras_dir = distance(meters=lado).destination(tras_pt, (heading + 90) % 360)
+        # Vértice traseiro esquerdo
+        tras_esq = distance(meters=lado).destination(tras_pt, (heading - 90) % 360)
+
+        return [
+            (tras_esq.latitude, tras_esq.longitude),
+            (frente_esq.latitude, frente_esq.longitude),
+            (tras_dir.latitude, tras_dir.longitude),
+            (frente_dir.latitude, frente_dir.longitude)
+        ]
+
 
     def points_calculation(self) -> None:
         """
@@ -496,6 +483,14 @@ class BouncingNode(Node):
         Also computes the camera heading angle for consistent orientation during image capture.
         """
 
+        rclpy.spin_once(self, timeout_sec=1.0)
+
+        coords = self.gerar_poligono_com_heading(self.drone.get_gps.latitude, self.drone.get_gps.longitude, self.drone.get_heading.data, 7.0, 7.0, 3.0)
+
+        self.corner_top_left = coords[0]
+        self.corner_top_right = coords[1]
+        self.corner_bottom_left = coords[2]
+        self.corner_bottom_right = coords[3]
 
         upper_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 3/8)
         lower_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 5/8)
@@ -536,17 +531,7 @@ class BouncingNode(Node):
 
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node = BouncingNode(
-        "cross",
--23.1968531,
- -45.9097045,
--23.1969834,
- -45.9096567,
--23.1968815,
- -45.9097825,
--23.1970036,
- -45.9097388
-    )
+    node = BouncingNode("cross")
     node.run()
     node.destroy_node()
     rclpy.shutdown()
