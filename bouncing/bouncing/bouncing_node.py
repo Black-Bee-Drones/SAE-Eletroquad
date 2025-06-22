@@ -102,18 +102,18 @@ class BouncingNode(Node):
         self.points_calculation()
 
         self.points_to_visit: List[Tuple[float, float]] = [
-            self.search_point_m4,
-            self.search_point_4a, 
+            self.search_point_4a,
+            self.search_point_m4, 
             self.search_point_4b, 
-            self.search_point_3a, 
+            self.search_point_3a,
+            self.search_point_m3, 
             self.search_point_3b, 
-            self.search_point_2a, 
+            self.search_point_2a,
+            self.search_point_m2, 
             self.search_point_2b,
             self.search_point_1a,
+            self.search_point_m1,
             self.search_point_1b,
-            self.search_point_m2,
-            self.search_point_m3,
-            self.search_point_m4
         ]
 
     def run_inference(self) -> Tuple[int, int]:
