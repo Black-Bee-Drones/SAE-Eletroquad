@@ -39,5 +39,5 @@ DISTANCE_ROBUST_B = -25.630841  # x coefficient
 DISTANCE_ROBUST_C = 234.170359  # constant term
 
 # -- Target parameters --
-TARGET_DISTANCE_CM = 60.      # Target distance from hose in cm
-DISTANCE_TOLERANCE_CM = 3.    # Tolerance for distance estimation
+TARGET_DISTANCE_CM = 67.2      # Target distance from hose in cm
+DISTANCE_TOLERANCE_CM = 5.    # Tolerance for distance estimation

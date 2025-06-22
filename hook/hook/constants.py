@@ -5,7 +5,7 @@ TAKEOFF_ALTITUDE = 4.87
 LINE_DETECTION_BLUE_COLOR_NAME = "red"
 LINE_DETECTION_RED_COLOR_NAME = "red"
 LINE_DETECTION_BLUE_SPACE = "hsv"
-LINE_DETECTION_RED_SPACE = "lab"
+LINE_DETECTION_RED_SPACE = "hsv"
 LINE_DETECTION_IMAGE_SOURCE = "webcam"
 LINE_DETECTION_SHOW_VISUALIZATION = "false"
 LINE_DETECT_NODE_NAME = "line_detector_process"
@@ -16,9 +16,9 @@ LINE_DETECTION_RED_CENTERING_TITLE = "Red Centering"
 LINE_DETECTION_DESCENT_TITLE = "Descent Tracking"
 LINE_DETECTION_METHOD = "RotatedRect"
 
-FORWARD_SPEED_SEARCH_BLUE_LINE = 0.15
+FORWARD_SPEED_SEARCH_BLUE_LINE = 0.38
 
-MIN_BLUE_LINE_DETECTIONS = 20  # Consecutive detections to confirm line
+MIN_BLUE_LINE_DETECTIONS = 17  # Consecutive detections to confirm line
 
 MIN_DESCEND_ALTITUDE = 2.6  # Failsafe altitude during descent
 
@@ -28,7 +28,7 @@ IMAGE_CENTER_X = 320.0
 IMAGE_CENTER_Y = 240.0
 ANGLE_SETPOINT = 0.0
 
-FORWARD_SPEED_FOLLOW_BLUE_LINE = 0.32
+FORWARD_SPEED_FOLLOW_BLUE_LINE = 0.38
 
 # PID Controller Process Names
 CENTER_PID_PROCESS = "center_pid_process"
@@ -63,26 +63,14 @@ MIN_RED_COUNT_CONFIRMATIONS = 5  # Consecutive frames above threshold
 CENTERING_CONFIRMATIONS = 14  # Consecutive low effort confirmations
 
 DESCEND_SPEED = -0.2  # m/s (negative for downward)
-DESCEND_TIMEOUT = 300  # Timeout for descent in seconds
-DESCEND_SPEED = -0.2  # m/s (negative for downward)
-DESCEND_TIMEOUT = 300  # Timeout for descent in seconds
+DESCEND_TIMEOUT = 30  # Timeout for descent in seconds
 
 # Descend PID Parameters
 DESCEND_KP_Z = 0.012  # Proportional gain for descent speed
-DESCEND_KP_Y = 0.0052  # Proportional gain for lateral speed
-DESCEND_KP_X = 0.0052  # Proportional gain for forward speed
+DESCEND_KP_Y = 0.0021  # Proportional gain for lateral speed
+DESCEND_KP_X = 0.0021  # Proportional gain for forward speed
 DESCEND_MAX_SPEED_Z = 0.24  # m/s
-DESCEND_MAX_SPEED_XY = 0.15  # m/s
-# Descend PID Parameters
-DESCEND_KP_Z = 0.012  # Proportional gain for descent speed
-DESCEND_KP_Y = 0.0052  # Proportional gain for lateral speed
-DESCEND_KP_X = 0.0052  # Proportional gain for forward speed
-DESCEND_MAX_SPEED_Z = 0.20  # m/s
-DESCEND_MAX_SPEED_XY = 0.15  # m/s
-
-HOCK_SERVO_CHANNEL = 3
-HOCK_RELEASE_PWM = 2000.0
-HOCK_HOLD_PWM = 1000.0
+DESCEND_MAX_SPEED_XY = 0.11  # m/s
 
 HOCK_SERVO_CHANNEL = 3
 HOCK_RELEASE_PWM = 2000.0

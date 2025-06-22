@@ -84,7 +84,7 @@ class Takeoff(State):
                 if abs(diff) < 0.10:
                     yasmin.YASMIN_LOG_INFO("Takeoff altitude reached.")
                     self.mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
-                    self.mavdrone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=1.0)
+                    #self.mavdrone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=1.0)
                     time.sleep(1)
                     return SUCCEED
 
