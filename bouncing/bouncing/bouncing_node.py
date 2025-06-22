@@ -53,7 +53,6 @@ class BouncingNode(Node):
             ordered as top-left, top-right, bottom-left, bottom-right.
         """
 
-
         super().__init__('bouncing_node')
 
         # Configura QoS com apenas 1 imagem no buffer
@@ -92,10 +91,10 @@ class BouncingNode(Node):
         
         self.drone: MavDrone = MavDrone(self, False)
 
-        self.corner_top_left: Tuple[float, float] = (p1_lat, p1_lon)     
-        self.corner_top_right: Tuple[float, float] = (p2_lat, p2_lon)    
-        self.corner_bottom_left: Tuple[float, float] = (p3_lat, p3_lon)  
-        self.corner_bottom_right: Tuple[float, float] = (p4_lat, p4_lon) 
+        self.corner_top_left: Tuple[float, float]     
+        self.corner_top_right: Tuple[float, float]    
+        self.corner_bottom_left: Tuple[float, float] 
+        self.corner_bottom_right: Tuple[float, float]
 
         self.search_point_1a: Tuple[float, float]
         self.search_point_1b: Tuple[float, float]
@@ -205,7 +204,7 @@ class BouncingNode(Node):
             self.drone.offboard_gps_position(
                 lat_setpoint=self.points_to_visit[0][0], 
                 lon_setpoint=self.points_to_visit[0][1], 
-                alt_setpoint=6.5, 
+                alt_setpoint=6.5,
                 heading=self.photos_heading,
                 precision_radius=0.1
             )
@@ -402,7 +401,9 @@ class BouncingNode(Node):
 
         error_front, error_sides = 50, 50
 
-        while abs(error_front) > 15 or abs(error_sides) > 15:
+        fails = 0
+
+        while abs(error_front) > 10 or abs(error_sides) > 10:
             error_front, error_sides, detect = self.calculate_error()
 
             ci_x, ci_y = 0.0, 0.0
@@ -422,8 +423,11 @@ class BouncingNode(Node):
                     self.drone.offboard_velocity_timer(0.0, 0.0, -0.3, 0.0, time=0.5)
             
             else:
-                self.drone.land()
-                break
+                fails += 1
+
+                if fails > 3:
+                    self.get_logger().info("Failed 3 times, landing...")
+                    break
 
             start_t = time.time()
 
@@ -492,29 +496,29 @@ class BouncingNode(Node):
         self.corner_bottom_left = coords[2]
         self.corner_bottom_right = coords[3]
 
-        upper_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 3/8)
-        lower_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 5/8)
+        upper_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 1/4)
+        lower_quarter_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 3/4)
 
         middle_left = self.drone.gps_controller.interp_geo(self.corner_top_left, self.corner_bottom_left, 1/2)
         middle_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 1/2)
 
-        upper_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 3/8)
-        lower_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 5/8)
+        upper_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 1/4)
+        lower_quarter_right = self.drone.gps_controller.interp_geo(self.corner_top_right, self.corner_bottom_right, 3/4)
 
-        self.search_point_1a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 2/8)
+        self.search_point_1a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 1/8)
         self.search_point_2a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 3/8)
         self.search_point_3a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 5/8)
-        self.search_point_4a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 6/8)
+        self.search_point_4a = self.drone.gps_controller.interp_geo(upper_quarter_left, upper_quarter_right, 7/8)
 
-        self.search_point_m1 = self.drone.gps_controller.interp_geo(middle_left, middle_right, 2/8)
+        self.search_point_m1 = self.drone.gps_controller.interp_geo(middle_left, middle_right, 1/8)
         self.search_point_m2 = self.drone.gps_controller.interp_geo(middle_left, middle_right, 3/8)
         self.search_point_m3 = self.drone.gps_controller.interp_geo(middle_left, middle_right, 5/8)
-        self.search_point_m4 = self.drone.gps_controller.interp_geo(middle_left, middle_right, 6/8)
+        self.search_point_m4 = self.drone.gps_controller.interp_geo(middle_left, middle_right, 7/8)
 
-        self.search_point_1b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 2/8)
+        self.search_point_1b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 1/8)
         self.search_point_2b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 3/8)
         self.search_point_3b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 5/8)
-        self.search_point_4b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 6/8)
+        self.search_point_4b = self.drone.gps_controller.interp_geo(lower_quarter_left, lower_quarter_right, 7/8)
 
         lat, lon, lat1, lon1 = map(np.radians, [self.search_point_4a[0], self.search_point_4a[1], self.search_point_1a[0], self.search_point_1a[1]])
 
@@ -531,7 +535,7 @@ class BouncingNode(Node):
 
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node = BouncingNode("cross")
+    node = BouncingNode("star")
     node.run()
     node.destroy_node()
     rclpy.shutdown()
