@@ -48,7 +48,7 @@ class HangTheHookSM(StateMachine):
         self.add_state(
             "SEARCH_BLUE_LINE",
             SearchBlueLine(),
-            transitions={SUCCEED: "FOLLOW_BLUE_LINE", ABORT: "RETURN_TO_LAUNCH"},
+            transitions={SUCCEED: "CENTER_RED_BLOB", ABORT: "RETURN_TO_LAUNCH"},
         )
 
         self.add_state(

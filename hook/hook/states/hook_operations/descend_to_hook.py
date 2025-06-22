@@ -128,7 +128,7 @@ class PerformDescent(State):
 
             # X velocity (forward/backward centering with dynamic offset)
             offset_px = ImageCalculus.calculate_offset_pixels(
-                0.083, distance_m, 43.3, 480
+                0.0821, distance_m, 43.3, 480
             )
             setpoint_y = IMAGE_CENTER_Y + offset_px
             error_y = setpoint_y - self.center_y

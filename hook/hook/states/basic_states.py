@@ -71,6 +71,7 @@ class Takeoff(State):
 
             time.sleep(3)
 
+
             start_time = time.time()
             timeout = 30
             while time.time() - start_time < timeout:
@@ -83,17 +84,16 @@ class Takeoff(State):
                 if abs(diff) < 0.10:
                     yasmin.YASMIN_LOG_INFO("Takeoff altitude reached.")
                     self.mavdrone.offboard_velocity(0.0, 0.0, 0.0, 0.0)
+                    self.mavdrone.offboard_velocity_timer(0.5, 0.0, 0.0, 0.0, time=1.0)
                     time.sleep(1)
                     return SUCCEED
 
-                if diff < 0.0:
-                    self.mavdrone.offboard_velocity(0.0, 0.0, -0.25 * diff, 0.0)
-                else:
-                    self.mavdrone.offboard_velocity(0.0, 0.0, 0.25 * diff, 0.0)
+                self.mavdrone.offboard_velocity(0.0, 0.0, -0.25 * diff, 0.0)
 
             yasmin.YASMIN_LOG_ERROR("Takeoff timed out.")
             return ABORT
 
+        
         except Exception as e:
             yasmin.YASMIN_LOG_ERROR(f"Takeoff failed: {e}")
             return ABORT
