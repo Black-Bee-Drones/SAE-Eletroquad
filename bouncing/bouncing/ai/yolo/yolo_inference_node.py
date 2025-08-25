@@ -65,11 +65,11 @@ class YOLOv8Node(Node):
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(img_rgb)
 
-        _, detections, inference_time_ms = self.yolo.detect(
+        _, detections = self.yolo.detect(
             pil_img, conf_thres=self.conf_thres, iou_thres=self.iou_thres
         )
 
-        print(f"Inference time: {inference_time_ms:.2f} ms")
+        #print(f"Inference time: {inference_time_ms:.2f} ms")
 
         # Pack all detection information into a single message
         # Format: [num_detections, det1_class_id, det1_center_x, det1_center_y, det1_width, det1_height, ...]
