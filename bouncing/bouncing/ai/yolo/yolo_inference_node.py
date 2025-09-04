@@ -19,7 +19,7 @@ class YOLOv8Node(Node):
             "model_path",
             os.path.abspath(
                 os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)), "models", "best.onnx"
+                    os.path.dirname(os.path.abspath(__file__)), "yolov11n.onnx"
                 )
             ),
         )
