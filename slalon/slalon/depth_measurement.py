@@ -1,19 +1,10 @@
-import rclpy
 from rclpy.node import Node
 import cv2
 import numpy as np
 from std_msgs.msg import Float32
 from std_msgs.msg import Int8
 from itertools import groupby
-from mirela_sdk.image_processing.color import ColorSpace, ColorDetector
-from cv_bridge import CvBridge
-from sensor_msgs.msg import Image
-from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
-
-#Movimentação do drone conforme as cores
-#Altura max do drone é de 2.5 metros
-#O lado que se deve percorrer a primeira trave é fornecido no dia da prova
-
+from mirela_sdk.image_processing.color import ColorDetector
 
 
 class DepthMeasurement(Node):
@@ -24,6 +15,7 @@ class DepthMeasurement(Node):
 
         self.find_pub = self.create_publisher(Int8, "where_is_it", 10)
 
+        #Defines which color is being filtered
         self.detector = ColorDetector("preset", "blue_sl")
 
         self.declare_parameter("cap", 0)
@@ -33,23 +25,11 @@ class DepthMeasurement(Node):
             cap = cap_param
 
         self.cap = cv2.VideoCapture(cap)
-        self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-        self.cap.set(cv2.CAP_PROP_FOCUS, 0)  # pode variar entre 0–255
 
         self.width = 0
 
-        #Numero de pixels filtrado vezes a distancia da camera à esse numero de pixels
+        #Number of filtered pixels times the distance to the camera at that number of pixels
         self.const: float = 69*100 
-
-        qos_prof = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            history = QoSHistoryPolicy.KEEP_LAST,
-            depth = 1
-        )
-
-        self.pub_cam = self.create_publisher(Image, 'camera/image_raw', qos_prof)
-
-        self.bridge = CvBridge()
 
         
     def depth_callback(self):
@@ -57,22 +37,23 @@ class DepthMeasurement(Node):
 
         self.detector.filterColor(frame)
         
+        #Calculates how many white pixels are in each column of the mask filtered
+        col_sums = np.count_nonzero(self.detector.mask, axis=0) 
 
-        # Calcular quantos pixels brancos existem em cada coluna
-        col_sums = np.count_nonzero(self.detector.mask, axis=0)  # shape: (640,)
-
-        # Criar máscara booleana das colunas que passam do limite (60% da altura = 288)
-        valid_cols = col_sums > 240
+        #Validates only the columns that have at least 42% of their pixels white
+        valid_cols = col_sums > 200
 
 
         indices = np.where(valid_cols)[0]
+        #Groups consecutive valid columns
         groups = [list(g) for k, g in groupby(enumerate(indices), lambda x: x[0] - x[1])]
 
-        # Encontrar o maior grupo contínuo (maior faixa de colunas válidas)
+        #Finds the biggest group (with more valid consecutive columns)
         longest_group = max(groups, key=len, default=[])
 
         pipe_area = np.zeros_like(self.detector.mask)
 
+        #Limits the size of a valid group to bigger than 15 columns and smaller than 69
         if 69 > len(longest_group) > 15:
             begin = longest_group[0][1]
             end = longest_group[-1][1]
@@ -84,71 +65,53 @@ class DepthMeasurement(Node):
         #Matriz do tamanho da mascara preenchida com zeros
         roi = np.zeros_like(self.detector.mask)
 
-        #Define uma linha no centro dessa matriz com valor 255, que será a área de detecção
-        roi[230:250,:] = 255
+        #Defines a line at the center of the matrix that filters out anything outside its region
+        roi[240:241,:] = 255
 
+        #Pixels filtered that are in the line region
         pixels_in_roi = cv2.bitwise_and(self.detector.mask, roi)
-
-        #pixels_in_roi = cv2.cvtColor(pixels_in_roi, cv2.COLOR_BGR2GRAY)
 
         self.pipe_in_roi = cv2.bitwise_and(pipe_area, roi)
 
+        pixels_nonzero = np.count_nonzero(pixels_in_roi)
 
-        pixels_nonzero = np.count_nonzero(self.pipe_in_roi)/20
-
-
-        #Regra de 3 para calcular a distancia baseado na variação do número de pixels
-        # distance = self.const / self.width if self.width != 0 else 0.0
+        #Calculates distance based on the number of pixels
         distance = self.const / pixels_nonzero if pixels_nonzero != 0 else 0.0
 
-        """Identifies whether the object is located at the right side or the left side of the image or at its center"""
         left = np.count_nonzero(self.pipe_in_roi[:, 0:320])
         right= np.count_nonzero(self.pipe_in_roi[:, 320:640])
-
-        self.get_logger().info(f"distance: {distance:.2f}")
+        center = np.count_nonzero(self.pipe_in_roi[:, 230:410])
 
         msg = Int8()
 
         if not left and not right:
             msg.data = 0
-            self.find_pub.publish(msg) #nenhum objeto encontrado
-        elif abs(left - right) < 10:
-            msg.data=1
-            self.find_pub.publish(msg)
+            self.find_pub.publish(msg) #No object found
+        elif center >= 384: #80% of 480
+            msg.data = 1
+            self.find_pub.publish(msg) #Found in center
         elif left > right:
             msg.data = 2
-            self.find_pub.publish(msg) #ta mais pra esquerda
+            self.find_pub.publish(msg) #Left side
         else:
             msg.data = 3
-            self.find_pub.publish(msg) #ta mais pra direita
-        #self.get_logger().info(f"left: {left} right: {right}")
-    
+            self.find_pub.publish(msg) #Right side
+
+        #print(f'distance: {distance}')
+
         msg = Float32()
         msg.data = float(distance)
+        #Publishes distance to pipe
         self.pub.publish(msg)
         
-        # msg = self.bridge.cv2_to_imgmsg(pipe_area, encoding='8UC1')
-        # self.pub_cam.publish(msg)
-        
-        # cv2.imshow("frame", frame)
-        # cv2.imshow("pipe_area", pipe_area)
-        # cv2.imshow("pipe_in_roi", self.pipe_in_roi)
-        # cv2.imshow("mask", self.detector.mask)
+        #print(f'{distance:.2f}')
+        #print(pixels_nonzero)
 
-        # cv2.waitKey(1)
+        #cv2.imshow("preview", frame)
+        #cv2.imshow("pipe_area", pipe_area)
+        #cv2.imshow("result", self.pipe_in_roi)
+        #cv2.imshow("mask", self.detector.mask)
 
-
-def main(args=None):
-    rclpy.init()
-    st = DepthMeasurement(2)
-    st.create_timer(1/30, st.depth_callback)
-    rclpy.spin(st)
-
-
-    rclpy.shutdown()
-
-if __name__ == "__main__":
-    main()
-
-
-
+        if cv2.waitKey(1) == ord('q'):
+            cv2.destroyAllWindows()
+            self.cap.release()
