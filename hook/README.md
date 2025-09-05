@@ -6,7 +6,7 @@ Este pacote implementa a lógica de controle para a Missão 2 da competição SA
 
 O objetivo desta missão é decolar transportando um gancho e realizar a colocação ou soltura deste gancho de forma que ele fique preso, por gravidade, a uma mangueira vermelha com 12.7 mm de diâmetro, representando uma linha de transmissão, erguida a 2 metros de altura. O veículo deverá decolar de uma base quadrada no solo contendo um círculo azul e localizar uma mangueira vermelha na qual o gancho deverá ser pendurado. Ao realizar a soltura, o veículo deverá voltar e pousar na base de onde decolou. Para auxiliar na localização da mangueira vermelha, o drone poderá (sem obrigatoriedade) seguir uma linha azul no solo, com 25 cm de espessura.
 
-![](./assets/mission_ilustrate.png)
+![](../assets/mission_ilustrate.png)
 
 
 ## Implementação
