@@ -1,19 +1,19 @@
 # Pacote Slalom - Missão 1 (M1): "Slalom"
-    Descreve a lógica utilizada para realização da missão 1 (Slalom) na competição SAE Aerodesign Eletroquad.
+Descreve a lógica utilizada para realização da missão 1 (Slalom) na competição SAE Aerodesign Eletroquad.
 
 ## Descrição da missão
-    A missão Slalom consiste em 4 em canos de pvc erguidos verticalmente ao solo e dispostos um atrás do outro de maneira não alinhada.
-    O objetivo da missão é fazer com que o drone levante voo, passe por todos os canos, alternando entre passar à direita e à esquerda a cada cano concluído, e pouse seguramente após passar pelo último. 
-    Os canos de pvc são de diferentes cores, sendo elas: rosa, vermelho, azul e preto. A ordem que essas cores estão dispostas é fornecida apenas no dia da competição, assim como o lado pelo qual o drone deve passar pelo primeiro cano (direita ou esquerda).
+A missão Slalom consiste em 4 em canos de pvc erguidos verticalmente ao solo e dispostos um atrás do outro de maneira não alinhada.
+O objetivo da missão é fazer com que o drone levante voo, passe por todos os canos, alternando entre passar à direita e à esquerda a cada cano concluído, e pouse seguramente após passar pelo último. 
+Os canos de pvc são de diferentes cores, sendo elas: rosa, vermelho, azul e preto. A ordem que essas cores estão dispostas é fornecida apenas no dia da competição, assim como o lado pelo qual o drone deve passar pelo primeiro cano (direita ou esquerda).
 
 ## Implementação
-    Para realizar esta missão, foram utilizadas 3 classes:
-    DepthMeasurement: que identifica o cano através de um filtro de cor e calcula a distância entre o drone e o cano.
-    Depth_St: máquina de estados que define a cor que está sendo filtrada.
-    Movement: dita todas as movimentações do drone para facilitar identificação dos canos, aproximar-se, centralizar-se e passar por eles. Define uma máquina de estados para coordenar o que o drone deve fazer em cada estágio da missão.
+Para realizar esta missão, foram utilizadas 3 classes:
+DepthMeasurement: que identifica o cano através de um filtro de cor e calcula a distância entre o drone e o cano.
+Depth_St: máquina de estados que define a cor que está sendo filtrada.
+Movement: dita todas as movimentações do drone para facilitar identificação dos canos, aproximar-se, centralizar-se e passar por eles. Define uma máquina de estados para coordenar o que o drone deve fazer em cada estágio da missão.
 
-    Máquina de estado de Depth_St:
-    '''mermaid
+Máquina de estado de Depth_St:
+    ```mermaid
     ---
     config:
     layout: dagre
@@ -28,10 +28,10 @@
     RED --> BLUE
     BLUE --> END
     END --> [*]
-    '''
+    ```
 
-    Máquina de estados de Movement:
-    '''mermaid
+Máquina de estados de Movement:
+    ```mermaid
     ---
     config:
     look: classic
@@ -57,4 +57,4 @@
     note right of STATE_3 : Moves drone foward until it reaches a certain distance from the pipe.
     note left of STATE_4 : Moves drone to the side it is supposed to pass by the pipe, then moves it foward, counting the succeed pipe and leaving it behind.
     note right of STATE_5 : LAND
-    '''
+    ```
