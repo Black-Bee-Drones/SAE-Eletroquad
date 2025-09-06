@@ -1,0 +1,38 @@
+# Arquivos Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ambientes virtuais
+env/
+venv/
+.venv/
+
+# Logs e dumps
+*.log
+
+# Arquivos temporários
+*.swp
+*.bak
+*.tmp
+*.~ 
+
+# VS Code
+.vscode/
+
+# Arquivos do ROS2 (colcon e builds)
+build/
+install/
+log/
+*.launch.pyc
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
